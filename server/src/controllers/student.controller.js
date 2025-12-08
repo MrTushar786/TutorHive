@@ -1,0 +1,108 @@
+import { StatusCodes } from "http-status-codes";
+import Booking from "../models/Booking.js";
+import User from "../models/User.js";
+
+const MAX_RECENT_ACTIVITY = 6;
+
+function mapSession(booking) {
+  return {
+    id: booking._id,
+    tutor: booking.tutor?.name,
+    tutorId: booking.tutor?._id,
+    subject: booking.subject,
+    startTime: booking.startTime,
+    duration: booking.duration,
+    status: booking.status,
+    hourlyRate: booking.tutor?.hourlyRate,
+  };
+}
+
+export async function getDashboard(req, res) {
+  const { studentId } = req.params;
+
+  if (req.user.role !== "admin" && req.user.id !== studentId) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: "Not authorized" });
+  }
+
+  const student = await User.findById(studentId);
+  if (!student || student.role !== "student") {
+    return res.status(StatusCodes.NOT_FOUND).json({ message: "Student not found" });
+  }
+
+  const bookings = await Booking.find({ student: studentId })
+    .populate("tutor", "name subjects avatar hourlyRate expertise availability stats rating reviews")
+    .sort({ startTime: 1 });
+
+  const now = new Date();
+  const upcomingSessions = bookings.filter((booking) => booking.startTime >= now).slice(0, 5).map(mapSession);
+
+  const recentActivity = bookings
+    .slice(-MAX_RECENT_ACTIVITY)
+    .reverse()
+    .map((booking) => ({
+      id: booking._id,
+      type: booking.status,
+      message: `Session with ${booking.tutor?.name} for ${booking.subject}`,
+      time: booking.updatedAt,
+      icon: booking.status === "confirmed" ? "📅" : booking.status === "completed" ? "✅" : "⏳",
+    }));
+
+  const progressBySubject = bookings.reduce((acc, booking) => {
+    acc[booking.subject] = acc[booking.subject] || { lessons: 0, completed: 0 };
+    acc[booking.subject].lessons += 1;
+    if (booking.status === "completed") {
+      acc[booking.subject].completed += 1;
+    }
+    return acc;
+  }, {});
+
+  const progressData = Object.entries(progressBySubject).map(([subject, data]) => ({
+    subject,
+    progress: Math.round((data.completed / data.lessons) * 100) || 0,
+    lessons: data.lessons,
+  }));
+
+  const tutors = await User.find({ role: "tutor" })
+    .limit(12)
+    .sort({ "stats.averageRating": -1 });
+
+  const tutorsResponse = tutors.map((tutor) => ({
+    id: tutor._id,
+    name: tutor.name,
+    subject: tutor.subjects?.[0] ?? "General",
+    rating: tutor.rating,
+    reviews: tutor.reviews,
+    hourlyRate: tutor.hourlyRate,
+    experience: `${Math.floor(Math.random() * 8 + 5)}+ years`,
+    avatar: tutor.avatar ?? "👨‍🏫",
+    expertise: tutor.expertise,
+    availability: tutor.availability?.join(", ") ?? "Flexible",
+  }));
+
+  // Compute overall stats from bookings for dynamic progress
+  const totalLessons = bookings.length;
+  const completedLessons = bookings.filter((b) => b.status === "completed").length;
+  const upcomingLessons = bookings.filter((b) => b.startTime >= now).length;
+  const totalMinutes = bookings.reduce((sum, b) => sum + (b.duration || 0), 0);
+  const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+  const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+  const studentResponse = {
+    ...student.toObject(),
+    stats: {
+      completedLessons,
+      upcomingLessons,
+      totalHours,
+      progressPercentage,
+    },
+  };
+
+  res.json({
+    student: studentResponse,
+    upcomingSessions,
+    recentActivity,
+    progressData,
+    availableTutors: tutorsResponse,
+  });
+}
+
