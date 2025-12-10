@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import AuthPage from "./auth/AuthPage";
 import StudentDashboard from "./student/StudentDashboard";
 import TutorDashboard from "./tutor/TutorDashboard";
+import VideoCallPage from "./pages/VideoCallPage";
 import ProtectedRoute from "./component/ProtectedRoute";
 
 export default function AppRouter() {
@@ -24,6 +25,14 @@ export default function AppRouter() {
           element={(
             <ProtectedRoute allowedRoles={["tutor"]}>
               <TutorDashboard />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/video-call/:bookingId"
+          element={(
+            <ProtectedRoute allowedRoles={["student", "tutor"]}>
+              <VideoCallPage />
             </ProtectedRoute>
           )}
         />

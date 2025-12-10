@@ -73,9 +73,9 @@ export async function getMySessions(req, res) {
 
   const now = new Date();
   if (status === "upcoming" || !status) {
-    // For upcoming, show future sessions that are not cancelled
+    // For upcoming, show future sessions that are not cancelled or completed
     query.startTime = { $gte: now };
-    query.status = { $ne: "cancelled" };
+    query.status = { $nin: ["cancelled", "completed"] };
   } else if (status === "completed") {
     query.status = "completed";
   } else if (status === "cancelled") {
@@ -84,25 +84,35 @@ export async function getMySessions(req, res) {
     query.status = status;
   }
 
-  const bookings = await Booking.find(query)
-    .populate(role === "student" ? "tutor" : "student", "name email avatar")
-    .sort({ startTime: status === "upcoming" ? 1 : -1 });
+  try {
+    const bookings = await Booking.find(query)
+      .populate(role === "student" ? "tutor" : "student", "name email avatar")
+      .sort({ startTime: status === "upcoming" ? 1 : -1 });
 
-  const sessions = bookings.map((booking) => ({
-    id: booking._id.toString(),
-    tutor: role === "student" ? booking.tutor?.name : undefined,
-    student: role === "tutor" ? booking.student?.name : undefined,
-    subject: booking.subject,
-    startTime: booking.startTime,
-    duration: booking.duration,
-    status: booking.status,
-    price: booking.price,
-    notes: booking.notes,
-    meetingRoomId: booking.meetingRoomId,
-    avatar: role === "student" ? booking.tutor?.avatar : booking.student?.avatar,
-  }));
+    console.log(`Found ${bookings.length} bookings for ${role} ${userId} with status ${status || "upcoming"}`);
 
-  res.json({ sessions });
+    const sessions = bookings.map((booking) => ({
+      id: booking._id.toString(),
+      tutor: role === "student" ? booking.tutor?.name : undefined,
+      student: role === "tutor" ? booking.student?.name : undefined,
+      subject: booking.subject,
+      startTime: booking.startTime,
+      duration: booking.duration,
+      status: booking.status,
+      price: booking.price,
+      notes: booking.notes,
+      meetingRoomId: booking.meetingRoomId,
+      avatar: role === "student" ? booking.tutor?.avatar : booking.student?.avatar,
+    }));
+
+    res.json({ sessions });
+  } catch (error) {
+    console.error("Error fetching sessions:", error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: "Failed to fetch sessions",
+      error: error.message 
+    });
+  }
 }
 
 export async function updateBookingStatus(req, res) {

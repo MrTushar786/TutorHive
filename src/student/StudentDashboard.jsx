@@ -3,7 +3,6 @@ import "./StudentDashboard.css";
 import useAuth from "../hooks/useAuth";
 import { fetchStudentDashboard } from "../api/student";
 import { createBooking, getMySessions, updateBookingStatus, generateMeetingRoom, submitFeedback } from "../api/booking";
-import VideoCall from "../components/VideoCall";
 import RescheduleDialog from "../components/RescheduleDialog";
 import ProfileEdit from "../components/ProfileEdit";
 import Messaging from "../components/Messaging";
@@ -53,8 +52,6 @@ export default function StudentDashboard() {
   const [sessionsFilter, setSessionsFilter] = useState("upcoming");
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [videoCallRoom, setVideoCallRoom] = useState(null);
-  const [selectedSession, setSelectedSession] = useState(null);
   const [rescheduleDialog, setRescheduleDialog] = useState(null);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const { user, token, logout } = useAuth();
@@ -91,9 +88,13 @@ export default function StudentDashboard() {
     setSessionsLoading(true);
     try {
       const response = await getMySessions(sessionsFilter, token);
-      setSessions(response.sessions || []);
+      console.log("Sessions response:", response);
+      const sessionsData = response?.sessions || response?.data?.sessions || response || [];
+      setSessions(Array.isArray(sessionsData) ? sessionsData : []);
     } catch (err) {
-      setError(err.message);
+      console.error("Error loading sessions:", err);
+      setError(err.message || "Failed to load sessions");
+      setSessions([]);
     } finally {
       setSessionsLoading(false);
     }
@@ -228,13 +229,8 @@ export default function StudentDashboard() {
 
   const handleJoinSession = async (session) => {
     try {
-      let roomId = session.meetingRoomId;
-      if (!roomId) {
-        const response = await generateMeetingRoom(session.id, token);
-        roomId = response.meetingRoomId;
-      }
-      setVideoCallRoom(roomId);
-      setSelectedSession(session);
+      // Navigate to video call page with booking ID
+      window.location.href = `/video-call/${session.id}`;
     } catch (err) {
       setError(err.message);
     }
@@ -275,14 +271,10 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleCloseVideoCall = () => {
-    setVideoCallRoom(null);
-    setSelectedSession(null);
-  };
 
   const handleFeedbackSubmit = async (feedback) => {
     try {
-      await submitFeedback(selectedSession.id, feedback, token);
+      await submitFeedback(feedback.sessionId, feedback, token);
       await loadSessions();
       await loadDashboard();
     } catch (err) {
@@ -608,13 +600,15 @@ export default function StudentDashboard() {
                     <div className="session-card-right">
                       <span className={`status-badge ${session.status}`}>{session.status}</span>
                       <div className="session-actions">
-                        {sessionsFilter === "upcoming" && session.status === "confirmed" && (
+                        {sessionsFilter === "upcoming" && (session.status === "confirmed" || session.status === "pending") && (
                           <button
                             className="action-btn primary"
                             onClick={() => handleJoinSession(session)}
                             type="button"
+                            disabled={session.status === "pending"}
+                            title={session.status === "pending" ? "Waiting for tutor confirmation" : "Join Session"}
                           >
-                            Join Session
+                            {session.status === "pending" ? "Pending Confirmation" : "Join Session"}
                           </button>
                         )}
                         {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
@@ -900,16 +894,6 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {videoCallRoom && (
-        <VideoCall
-          roomId={videoCallRoom}
-          onClose={handleCloseVideoCall}
-          userName={user?.name || "Student"}
-          isTutor={false}
-          session={selectedSession}
-          onSubmitFeedback={handleFeedbackSubmit}
-        />
-      )}
 
       {rescheduleDialog && (
         <RescheduleDialog

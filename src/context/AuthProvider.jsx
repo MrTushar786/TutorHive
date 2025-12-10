@@ -5,16 +5,31 @@ import AuthContext from "./AuthContext";
 const STORAGE_KEY = "tutorhive_session";
 
 function persistSession(token) {
-  localStorage.setItem(STORAGE_KEY, token);
+  try {
+    localStorage.setItem(STORAGE_KEY, token);
+  } catch (error) {
+    console.warn("Failed to persist session to localStorage:", error);
+  }
 }
 
 function clearSession() {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to clear session from localStorage:", error);
+  }
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY));
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+      console.warn("Failed to read from localStorage:", error);
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

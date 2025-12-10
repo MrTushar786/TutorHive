@@ -19,6 +19,7 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
     "react-scroll": "^1.9.3",
+    "socket.io-client": "^4.8.1",
     "three": "^0.181.2"
   },
   "devDependencies": {

@@ -3,7 +3,6 @@ import "./TutorDashboard.css";
 import useAuth from "../hooks/useAuth";
 import { fetchTutorDashboard } from "../api/tutor";
 import { getMySessions, updateBookingStatus, generateMeetingRoom } from "../api/booking";
-import VideoCall from "../components/VideoCall";
 import ProfileEdit from "../components/ProfileEdit";
 import Messaging from "../components/Messaging";
 import { getConversationId } from "../hooks/useConversationId";
@@ -42,8 +41,6 @@ export default function TutorDashboard() {
   const [sessionsFilter, setSessionsFilter] = useState("upcoming");
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [videoCallRoom, setVideoCallRoom] = useState(null);
-  const [selectedSession, setSelectedSession] = useState(null);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const { user, token, logout } = useAuth();
   const [deletedConvIds, setDeletedConvIds] = useState([]);
@@ -79,9 +76,13 @@ export default function TutorDashboard() {
     setSessionsLoading(true);
     try {
       const response = await getMySessions(sessionsFilter, token);
-      setSessions(response.sessions || []);
+      console.log("Tutor sessions response:", response);
+      const sessionsData = response?.sessions || response?.data?.sessions || response || [];
+      setSessions(Array.isArray(sessionsData) ? sessionsData : []);
     } catch (err) {
-      setError(err.message);
+      console.error("Error loading tutor sessions:", err);
+      setError(err.message || "Failed to load sessions");
+      setSessions([]);
     } finally {
       setSessionsLoading(false);
     }
@@ -160,13 +161,8 @@ export default function TutorDashboard() {
 
   const handleJoinSession = async (session) => {
     try {
-      let roomId = session.meetingRoomId;
-      if (!roomId) {
-        const response = await generateMeetingRoom(session.id, token);
-        roomId = response.meetingRoomId;
-      }
-      setVideoCallRoom(roomId);
-      setSelectedSession(session);
+      // Navigate to video call page with booking ID
+      window.location.href = `/video-call/${session.id}`;
     } catch (err) {
       setError(err.message);
     }
@@ -195,20 +191,6 @@ export default function TutorDashboard() {
     }
   };
 
-  const handleCloseVideoCall = async () => {
-    // Mark session as completed when ending
-    if (selectedSession && selectedSession.status === "confirmed") {
-      try {
-        await updateBookingStatus(selectedSession.id, "completed", token);
-        await loadSessions();
-        await loadDashboard();
-      } catch (err) {
-        console.error("Error updating session status:", err);
-      }
-    }
-    setVideoCallRoom(null);
-    setSelectedSession(null);
-  };
 
   if (loading) {
     return (
@@ -726,15 +708,6 @@ export default function TutorDashboard() {
         </div>
       )}
 
-      {videoCallRoom && (
-        <VideoCall
-          roomId={videoCallRoom}
-          onClose={handleCloseVideoCall}
-          userName={user?.name || "Tutor"}
-          isTutor={true}
-          session={selectedSession}
-        />
-      )}
     </div>
   );
 }

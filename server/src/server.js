@@ -4,6 +4,7 @@ import app from "./app.js";
 import connectDB from "./config/db.js";
 import { setupWebSocketServer } from "./websocket/roomHandler.js";
 import { setupMessageWebSocketServer } from "./websocket/messageHandler.js";
+import { setupVideoSocket } from "./websocket/videoSocket.js";
 
 dotenv.config();
 
@@ -15,10 +16,12 @@ async function startServer() {
     const server = createServer(app);
     setupWebSocketServer(server);
     setupMessageWebSocketServer(server);
+    setupVideoSocket(server);
     server.listen(PORT, () => {
-      console.log(`API ready on port ${PORT}`);
-      console.log(`WebSocket server ready on ws://localhost:${PORT}/ws`);
-      console.log(`Message WebSocket server ready on ws://localhost:${PORT}/ws/messages`);
+      console.log(`✅ API ready on port ${PORT}`);
+      console.log(`✅ WebSocket server ready on ws://localhost:${PORT}/ws`);
+      console.log(`✅ Message WebSocket server ready on ws://localhost:${PORT}/ws/messages`);
+      console.log(`✅ Socket.IO video signaling server ready on /bridge`);
     });
   } catch (error) {
     console.error("Failed to start server", error);
