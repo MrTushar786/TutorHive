@@ -95,4 +95,6 @@ cd server && npm run dev  # API with Nodemon + ESLint on save
 - 3D hero animations and fully responsive UI
 - Shared loading/error states and secure route guards
 
-Feel free to extend the API (e.g., messaging, payments) or plug in your own AI-driven tutor matching—everything is structured for easy iteration. Happy hacking! 🎓🐝
+Feel free to extend the API (e.g., messaging, payments) or plug in your own AI-driven tutor matching—everything is structured for easy iteration. Happy hacking! 🎓🐝.
+
+Done by mahendra 
