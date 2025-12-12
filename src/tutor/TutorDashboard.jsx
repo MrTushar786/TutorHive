@@ -33,6 +33,7 @@ export default function TutorDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [sessionModal, setSessionModal] = useState(false);
+  const [sessionForm, setSessionForm] = useState({ notes: "", goals: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [dashboardData, setDashboardData] = useState(null);
@@ -43,8 +44,31 @@ export default function TutorDashboard() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const { user, token, logout } = useAuth();
-  const [deletedConvIds, setDeletedConvIds] = useState([]);
+  const [deletedConvIds, setDeletedConvIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem("tutorDeletedConvIds");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("tutorDeletedConvIds", JSON.stringify(deletedConvIds));
+  }, [deletedConvIds]);
   const [realConversations, setRealConversations] = useState([]);
+
+  // Restore conversation if it reappears from backend
+  useEffect(() => {
+    if (realConversations.length > 0 && deletedConvIds.length > 0) {
+      const activeRealIds = new Set(realConversations.map(c => c.id));
+      const newDeletedIds = deletedConvIds.filter(id => !activeRealIds.has(id));
+
+      if (newDeletedIds.length !== deletedConvIds.length) {
+        setDeletedConvIds(newDeletedIds);
+      }
+    }
+  }, [realConversations, deletedConvIds]);
 
   const loadDashboard = useCallback(async () => {
     if (!user?._id) return;
@@ -119,6 +143,8 @@ export default function TutorDashboard() {
   useEffect(() => {
     if (activeTab === "messages") {
       loadConversations();
+      const interval = setInterval(loadConversations, 5000); // Poll every 5s for new chats
+      return () => clearInterval(interval);
     }
   }, [activeTab, loadConversations]);
 
@@ -155,8 +181,41 @@ export default function TutorDashboard() {
     setSelectedStudent(null);
   };
 
-  const handleSessionStart = () => {
-    closeSessionModal();
+  const handleSessionStart = async () => {
+    if (!selectedStudent || !user || !token) return;
+
+    try {
+      const response = await fetch('http://localhost:5000/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          tutorId: user._id,
+          studentId: selectedStudent.id || selectedStudent._id,
+          subject: selectedStudent.subject || "General Mentorship",
+          startTime: new Date().toISOString(),
+          duration: 60,
+          notes: `Goals: ${sessionForm.goals}\nNotes: ${sessionForm.notes}`
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Failed to start session");
+      }
+
+      const data = await response.json();
+      closeSessionModal();
+
+      if (data.booking) {
+        window.location.href = `/video-call/${data.booking._id}`;
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error starting session: " + err.message);
+    }
   };
 
   const handleJoinSession = async (session) => {
@@ -184,6 +243,20 @@ export default function TutorDashboard() {
   const handleConfirmSession = async (session) => {
     try {
       await updateBookingStatus(session.id, "confirmed", token);
+      await loadSessions();
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleMarkComplete = async (session) => {
+    if (!window.confirm("Are you sure you want to mark this session as completed?")) {
+      return;
+    }
+    try {
+      await updateBookingStatus(session.id, "completed", token);
+      // Wait a bit for status to propagate if needed, or just reload
       await loadSessions();
       await loadDashboard();
     } catch (err) {
@@ -244,7 +317,13 @@ export default function TutorDashboard() {
 
         <div className="sidebar-footer">
           <div className="user-profile">
-            <div className="user-avatar">{tutorProfile?.avatar || "👩‍🏫"}</div>
+            <div className="user-avatar">
+              {tutorProfile?.avatar?.startsWith("data:") || tutorProfile?.avatar?.startsWith("http") ? (
+                <img src={tutorProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                tutorProfile?.avatar || "👩‍🏫"
+              )}
+            </div>
             <div className="user-info">
               <div className="user-name">{tutorProfile?.name}</div>
               <div className="user-email">{tutorProfile?.email}</div>
@@ -302,7 +381,7 @@ export default function TutorDashboard() {
               <div className="stat-card green">
                 <div className="stat-icon">⭐</div>
                 <div className="stat-info">
-                  <div className="stat-value">{stats.averageRating.toFixed(1)}</div>
+                  <div className="stat-value">{(stats.averageRating || 0).toFixed(1)}</div>
                   <div className="stat-label">Average Rating</div>
                 </div>
               </div>
@@ -323,7 +402,13 @@ export default function TutorDashboard() {
                 <div className="sessions-list">
                   {upcomingSessions.map((session) => (
                     <div key={session.id} className="session-item">
-                      <div className="session-avatar">{session.avatar || "👨‍🎓"}</div>
+                      <div className="session-avatar">
+                        {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
+                          <img src={session.avatar} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        ) : (
+                          session.avatar || "👨‍🎓"
+                        )}
+                      </div>
                       <div className="session-details">
                         <div className="session-tutor">{session.student}</div>
                         <div className="session-subject">{session.subject}</div>
@@ -392,30 +477,53 @@ export default function TutorDashboard() {
               {filteredStudents.map((student) => (
                 <div key={student.id} className="student-card">
                   <div className="student-card-header">
-                    <div className="student-avatar-large">{student.avatar || "👩‍🎓"}</div>
-                    <div className="student-rating">
-                      <span className="star">⭐</span>
-                      <span className="rating-value">{student.rating?.toFixed(1) || "5.0"}</span>
+                    <div className="student-avatar-large">
+                      {student.avatar?.startsWith("data:") || student.avatar?.startsWith("http") ? (
+                        <img src={student.avatar} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      ) : (
+                        student.avatar || "👩‍🎓"
+                      )}
                     </div>
-                  </div>
-                  <div className="student-card-body">
                     <h3 className="student-name">{student.name}</h3>
-                    <div className="student-subject">{student.subject}</div>
-                    <div className="student-sessions">
-                      <span className="icon">📚</span>
-                      <span>{student.sessions} sessions</span>
+                    <div className="student-subject">{student.subject || "General Student"}</div>
+                  </div>
+
+                  <div className="student-card-body">
+                    <div className="student-stats-grid">
+                      <div className="student-stat-item profit">
+                        <div className="stat-label">Total Profit</div>
+                        <div className="stat-value highlight">{formatCurrency(student.totalEarnings || 0)}</div>
+                      </div>
+                      <div className="student-stat-item">
+                        <div className="stat-label">Hours</div>
+                        <div className="stat-value">{(student.totalHours || 0).toFixed(1)}h</div>
+                      </div>
+                      <div className="student-stat-item">
+                        <div className="stat-label">Sessions</div>
+                        <div className="stat-value">{student.sessions}</div>
+                      </div>
                     </div>
-                    <div className="student-progress">
-                      <span className="icon">📈</span>
-                      <span>{student.progress}% progress</span>
-                    </div>
+
                     <div className="student-last-session">
                       <span className="icon">📅</span>
-                      <span>Last session: {formatDate(student.lastSession)}</span>
+                      <span>Last: {formatDate(student.lastSession)}</span>
                     </div>
                   </div>
-                  <div className="student-card-footer">
-                    <button className="session-btn" onClick={() => openSessionModal(student)} type="button">
+
+                  <div className="student-card-footer two-buttons">
+                    <button
+                      className="action-btn secondary"
+                      onClick={() => setActiveTab("messages")}
+                      type="button"
+                      title="Message Student"
+                    >
+                      💬 Message
+                    </button>
+                    <button
+                      className="action-btn primary"
+                      onClick={() => openSessionModal(student)}
+                      type="button"
+                    >
                       Start Session
                     </button>
                   </div>
@@ -479,7 +587,13 @@ export default function TutorDashboard() {
                       <div className="session-main-info">
                         <h3>{session.subject}</h3>
                         <div className="session-tutor-info">
-                          <span className="tutor-avatar-small">{session.avatar || "👨‍🎓"}</span>
+                          <span className="tutor-avatar-small">
+                            {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
+                              <img src={session.avatar} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : (
+                              session.avatar || "👨‍🎓"
+                            )}
+                          </span>
                           <span>{session.student}</span>
                         </div>
                       </div>
@@ -497,6 +611,16 @@ export default function TutorDashboard() {
                           <span>${session.price}</span>
                         </div>
                       </div>
+                      {session.feedback && (
+                        <div className="session-feedback" style={{ marginTop: '1rem', padding: '0.5rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                          <div className="feedback-rating" style={{ color: '#FFD700' }}>{"⭐".repeat(session.feedback.rating)}</div>
+                          {session.feedback.comment && (
+                            <div className="feedback-comment" style={{ fontStyle: 'italic', fontSize: '0.9rem', color: '#666' }}>
+                              "{session.feedback.comment}"
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="session-card-right">
                       <span className={`status-badge ${session.status}`}>{session.status}</span>
@@ -511,13 +635,23 @@ export default function TutorDashboard() {
                           </button>
                         )}
                         {sessionsFilter === "upcoming" && session.status === "confirmed" && (
-                          <button
-                            className="action-btn primary"
-                            onClick={() => handleJoinSession(session)}
-                            type="button"
-                          >
-                            Start Session
-                          </button>
+                          <>
+                            <button
+                              className="action-btn primary"
+                              onClick={() => handleJoinSession(session)}
+                              type="button"
+                            >
+                              Start Session
+                            </button>
+                            <button
+                              className="action-btn"
+                              onClick={() => handleMarkComplete(session)}
+                              type="button"
+                              style={{ background: '#4CAF50', color: 'white', marginLeft: '0.5rem' }}
+                            >
+                              Mark Complete
+                            </button>
+                          </>
                         )}
                         {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
                           <button
@@ -551,7 +685,7 @@ export default function TutorDashboard() {
                 <div className="earnings-stats">
                   <div className="earnings-stat">
                     <div className="stat-label">Average Rating</div>
-                    <div className="stat-value">{stats.averageRating.toFixed(1)}</div>
+                    <div className="stat-value">{(stats.averageRating || 0).toFixed(1)}</div>
                   </div>
                   <div className="earnings-stat">
                     <div className="stat-label">Students</div>
@@ -620,14 +754,34 @@ export default function TutorDashboard() {
                     };
                   })
                   .filter(Boolean);
-                
+
                 return [...realConversations, ...potentialConversations].filter(c => !deletedConvIds.includes(c.id));
               })()}
               onSendMessage={(conversationId, message) => {
                 console.log("Sending message:", conversationId, message);
               }}
-              onDeleteConversation={(convId) => {
+              onDeleteConversation={async (convId) => {
+                // Always hide locally first (persistent)
                 setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
+                // If it's a real conversation, tell backend
+                try {
+                  await import("../api/messages").then(m => m.deleteChat(convId, token));
+                  setRealConversations(prev => prev.filter(c => c.id !== convId));
+                } catch (e) {
+                  // Ignore
+                }
+              }}
+              onMarkAsRead={async (convId) => {
+                // Optimistically update local state
+                setRealConversations(prev => prev.map(c =>
+                  c.id === convId ? { ...c, unreadCount: 0 } : c
+                ));
+                // Call backend
+                try {
+                  await import("../api/messages").then(m => m.markAsRead(convId, token));
+                } catch (e) {
+                  console.error("Failed to mark as read", e);
+                }
               }}
             />
           </div>
@@ -678,7 +832,13 @@ export default function TutorDashboard() {
               ×
             </button>
             <div className="modal-header">
-              <div className="modal-student-avatar">{selectedStudent.avatar || "👨‍🎓"}</div>
+              <div className="modal-student-avatar">
+                {selectedStudent.avatar?.startsWith("data:") || selectedStudent.avatar?.startsWith("http") ? (
+                  <img src={selectedStudent.avatar} alt={selectedStudent.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : (
+                  selectedStudent.avatar || "👨‍🎓"
+                )}
+              </div>
               <div>
                 <h2>Session with {selectedStudent.name}</h2>
                 <p className="modal-subject">{selectedStudent.subject}</p>
@@ -688,11 +848,23 @@ export default function TutorDashboard() {
               <div className="session-form">
                 <div className="form-group">
                   <label>Session Notes</label>
-                  <textarea className="form-input" rows="3" placeholder="Any notes for this session?" />
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    placeholder="Any notes for this session?"
+                    value={sessionForm.notes}
+                    onChange={(e) => setSessionForm({ ...sessionForm, notes: e.target.value })}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Goals for Today</label>
-                  <input type="text" className="form-input" placeholder="What will you cover today?" />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="What will you cover today?"
+                    value={sessionForm.goals}
+                    onChange={(e) => setSessionForm({ ...sessionForm, goals: e.target.value })}
+                  />
                 </div>
               </div>
             </div>

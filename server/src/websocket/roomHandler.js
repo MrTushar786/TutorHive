@@ -2,8 +2,8 @@ import { WebSocketServer } from "ws";
 
 const rooms = new Map(); // roomId -> Set of WebSocket connections
 
-export function setupWebSocketServer(server) {
-  const wss = new WebSocketServer({ server, path: "/ws" });
+export function createRoomWebSocketServer() {
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on("connection", (ws, req) => {
     const url = new URL(req.url, `http://${req.headers.host}`);

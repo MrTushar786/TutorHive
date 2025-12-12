@@ -1,7 +1,9 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import PeerConnection from "../utils/PeerConnection";
+import FeedbackForm from "../components/FeedbackForm";
 import { initVideoSocket, getVideoSocket, joinBookingRoom, disconnectVideoSocket } from "../utils/videoSocket";
 import "./VideoCallPage.css";
 
@@ -168,7 +170,7 @@ export default function VideoCallPage() {
               setRoomJoined(true);
               setConnectionStatus("connected");
               console.log("Room joined, starting media...");
-              
+
               // Start call after room is joined
               console.log("Starting media devices...");
               pc.start({ video: true, audio: true })
@@ -256,22 +258,22 @@ export default function VideoCallPage() {
             }
           });
 
-      // Handle call ended
-      socket.on("call-ended", () => {
-        handleEndCall();
-      });
+          // Handle call ended
+          socket.on("call-ended", () => {
+            handleEndCall();
+          });
 
-      // Handle user joined/left
-      socket.on("user-joined", (data) => {
-        console.log("User joined:", data);
-      });
+          // Handle user joined/left
+          socket.on("user-joined", (data) => {
+            console.log("User joined:", data);
+          });
 
-      socket.on("user-left", (data) => {
-        console.log("User left:", data);
-        if (connectionStatus === "peer-connected") {
-          setConnectionStatus("peer-disconnected");
-        }
-      });
+          socket.on("user-left", (data) => {
+            console.log("User left:", data);
+            if (connectionStatus === "peer-connected") {
+              setConnectionStatus("peer-disconnected");
+            }
+          });
 
           // Handle errors
           socket.on("error", (error) => {
@@ -347,14 +349,67 @@ export default function VideoCallPage() {
     }
   };
 
-  const handleEndCall = () => {
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  const handleEndCall = async (endedByUser = false) => {
+    // 1. Stop Media & Connection
     if (peerConnectionRef.current) {
       const isCaller = user.role === "tutor";
       peerConnectionRef.current.stop(isCaller);
       peerConnectionRef.current = null;
     }
     disconnectVideoSocket();
-    navigate(-1); // Go back to previous page
+
+    // 2. Mark session as completed in backend (if user initiated end)
+    if (endedByUser) {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        await fetch(`${apiUrl}/api/bookings/${bookingId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: "completed" })
+        });
+      } catch (err) {
+        console.error("Failed to mark session completed:", err);
+      }
+    }
+
+    // 3. Navigate or Show Feedback
+    if (user.role === "student") {
+      setShowFeedback(true);
+    } else {
+      navigate("/tutordashboard");
+    }
+  };
+
+  const handleFeedbackSubmit = async (data) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rating: data.rating,
+          comment: data.comment
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit feedback");
+      }
+
+      navigate("/studentdashboard");
+    } catch (err) {
+      console.error("Feedback error:", err);
+      alert("Failed to submit feedback, but session is ended.");
+      navigate("/studentdashboard");
+    }
   };
 
   if (error && !roomJoined) {
@@ -398,10 +453,10 @@ export default function VideoCallPage() {
         <div className="video-call-content">
           {/* Remote Video */}
           <div className="remote-video-container">
-            <video 
-              ref={remoteVideoRef} 
-              autoPlay 
-              playsInline 
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
               className="remote-video"
               style={{ display: remoteStream ? 'block' : 'none' }}
             />
@@ -414,17 +469,19 @@ export default function VideoCallPage() {
           </div>
 
           {/* Local Video - Always render so ref works */}
-          <div className="local-video-container" style={{ display: localStream ? 'block' : 'none' }}>
-            <video 
-              ref={localVideoRef} 
-              autoPlay 
-              playsInline 
-              muted 
+          <div className="local-video-container" style={{ display: 'block', opacity: localStream ? 1 : 0.5 }}>
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
               className="local-video"
+              onLoadedMetadata={() => console.log("Local video metadata loaded")}
             />
             {localStream && (
               <div className="video-label">{user.name || user.email}</div>
             )}
+            {!localStream && <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', background: 'rgba(0,0,0,0.5)' }}>Loading Camera...</div>}
           </div>
         </div>
 
@@ -444,10 +501,20 @@ export default function VideoCallPage() {
           >
             {isVideoOff ? "📵" : "📹"}
           </button>
-          <button className="control-btn end-call" onClick={handleEndCall} title="End Call">
+          <button className="control-btn end-call" onClick={() => handleEndCall(true)} title="End Call">
             📞 End Call
           </button>
         </div>
+
+        {/* Feedback Modal */}
+        {showFeedback && (
+          <FeedbackForm
+            session={{ id: bookingId, tutor: "Tutor", student: "Student" }} // Names could be improved if passed in props or fetched
+            isTutor={user.role === "tutor"}
+            onSubmit={handleFeedbackSubmit}
+            onCancel={() => navigate(user.role === "student" ? "/studentdashboard" : "/tutordashboard")}
+          />
+        )}
       </div>
     </div>
   );

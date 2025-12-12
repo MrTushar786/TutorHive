@@ -1,65 +1,88 @@
 import mongoose from "mongoose";
 import Message from "../models/Message.js";
+import Conversation from "../models/Conversation.js";
 import User from "../models/User.js";
 
 export const getConversations = async (req, res) => {
     const userId = req.user.id;
 
     try {
-        // Find all messages where the conversationId contains the userId
-        // Note: This relies on the conversationId format "conv-<a>-<b>"
+        // Find conversations involving this user where they haven't hidden it
         const regex = new RegExp(userId);
 
-        const conversations = await Message.aggregate([
-            {
-                $match: {
-                    conversationId: { $regex: regex }
-                }
-            },
-            {
-                $sort: { createdAt: -1 }
-            },
-            {
-                $group: {
-                    _id: "$conversationId",
-                    lastMessage: { $first: "$$ROOT" },
-                    unreadCount: {
-                        $sum: {
-                            $cond: [
-                                { $and: [{ $ne: ["$sender", new mongoose.Types.ObjectId(userId)] }, { $eq: ["$read", false] }] },
-                                1,
-                                0
-                            ]
-                        }
-                    }
-                }
-            }
-        ]);
+        let conversations = await Conversation.find({
+            conversationId: { $regex: regex },
+            hiddenFor: { $ne: userId }
+        })
+            .sort({ updatedAt: -1 })
+            .populate("participants", "name avatar");
 
-        // Now populate the other user's info
-        const populatedConversations = await Promise.all(conversations.map(async (conv) => {
-            const parts = conv._id.split("-");
-            // parts[0] is "conv"
-            // parts[1] and parts[2] are user IDs
-            const otherUserId = parts[1] === userId ? parts[2] : parts[1];
-
-            const otherUser = await User.findById(otherUserId).select("name avatar");
-
+        // Map to client format
+        const formatted = conversations.map(conv => {
+            const otherUser = conv.participants.find(p => p._id.toString() !== userId);
             if (!otherUser) return null;
 
             return {
-                id: conv._id,
+                id: conv.conversationId,
                 name: otherUser.name,
                 avatar: otherUser.avatar,
-                lastMessage: conv.lastMessage.text,
-                lastMessageTime: conv.lastMessage.createdAt,
-                unreadCount: conv.unreadCount
+                lastMessage: conv.lastMessage?.text || "No messages",
+                lastMessageTime: conv.lastMessage?.createdAt,
+                unreadCount: conv.unreadCounts?.get(userId) || 0
             };
-        }));
+        }).filter(Boolean);
 
-        res.json(populatedConversations.filter(Boolean));
+        res.json(formatted);
     } catch (error) {
         console.error("Error fetching conversations:", error);
         res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+};
+
+export const markAsRead = async (req, res) => {
+    const { conversationId } = req.body;
+    const userId = req.user.id;
+
+    try {
+        // Update messages
+        await Message.updateMany(
+            {
+                conversationId,
+                sender: { $ne: userId },
+                read: false
+            },
+            { $set: { read: true } }
+        );
+
+        // Update conversation unread count
+        await Conversation.updateOne(
+            { conversationId },
+            { $set: { [`unreadCounts.${userId}`]: 0 } }
+        );
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Error marking messages as read:", error);
+        res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+};
+
+export const deleteConversation = async (req, res) => {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+
+    console.log(`Deleting conversation ${conversationId} for user ${userId}`);
+
+    try {
+        // Hiding the conversation from the list view
+        await Conversation.updateOne(
+            { conversationId },
+            { $addToSet: { hiddenFor: userId } }
+        );
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Error deleting conversation:", error);
+        res.status(500).json({ message: "Failed to delete conversation" });
     }
 };

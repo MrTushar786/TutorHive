@@ -1,32 +1,131 @@
+
+
 import { StatusCodes } from "http-status-codes";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
+import TutorProfile from "../models/TutorProfile.js";
+import AvailabilitySlot from "../models/AvailabilitySlot.js";
+import Review from "../models/Review.js";
 import { createBookingSchema } from "../validation/booking.schema.js";
 
 export async function createBooking(req, res) {
   const payload = createBookingSchema.parse(req.body);
 
-  if (req.user.role !== "student") {
-    return res.status(StatusCodes.FORBIDDEN).json({ message: "Only students can book sessions" });
+  // Determine roles
+  let studentId, tutorId, status;
+
+  if (req.user.role === "student") {
+    studentId = req.user.id;
+    tutorId = payload.tutorId;
+    status = "pending";
+  } else if (req.user.role === "tutor") {
+    // Tutor creating an instant session
+    studentId = req.body.studentId;
+    if (!studentId) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Student ID is required for tutor-initiated bookings" });
+    }
+    tutorId = req.user.id;
+    status = "confirmed"; // Instant confirmation
+  } else {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: "Only students or tutors can book sessions" });
   }
 
-  const tutor = await User.findById(payload.tutorId);
+  const tutor = await User.findById(tutorId);
   if (!tutor || tutor.role !== "tutor") {
     return res.status(StatusCodes.NOT_FOUND).json({ message: "Tutor not found" });
   }
 
-  const booking = await Booking.create({
-    tutor: payload.tutorId,
-    student: req.user.id,
-    subject: payload.subject,
-    startTime: payload.startTime,
-    duration: payload.duration,
-    price: Math.round((payload.duration / 60) * tutor.hourlyRate),
-    notes: payload.notes,
-    status: "pending",
+  const student = await User.findById(studentId);
+  if (!student) {
+    return res.status(StatusCodes.NOT_FOUND).json({ message: "Student not found" });
+  }
+
+  // Calculate End Time
+  const startTime = new Date(payload.startTime);
+  const endTime = new Date(startTime.getTime() + payload.duration * 60000);
+
+  // 1. Check for existing slot
+  let slot = await AvailabilitySlot.findOne({
+    tutorId: payload.tutorId,
+    startUTC: startTime,
+    durationMin: payload.duration
   });
 
-  res.status(StatusCodes.CREATED).json({ booking });
+  let slotId = null;
+
+  if (slot) {
+    // 2. ATOMIC RESERVATION
+    const reservedSlot = await AvailabilitySlot.findOneAndUpdate(
+      { _id: slot._id, isBooked: false },
+      {
+        isBooked: true,
+        // bookingId will be set after booking creation (circular dependency handling or use 2-phase if needed)
+        // ideally we generate bookingId first or use transaction. 
+        // For simplicity without transactions: we mark it booked first.
+      },
+      { new: true }
+    );
+
+    if (!reservedSlot) {
+      return res.status(StatusCodes.CONFLICT).json({ message: "This slot has already been booked." });
+    }
+    slotId = reservedSlot._id;
+  } else {
+    // 3. Ad-hoc Booking: Create a new booked slot
+    // Check if any overlapping slot exists to be safe
+    const clash = await AvailabilitySlot.findOne({
+      tutorId: tutorId,
+      $or: [
+        { startUTC: { $lt: endTime }, endUTC: { $gt: startTime } }
+      ],
+      isBooked: true
+    });
+
+    if (clash) {
+      return res.status(StatusCodes.CONFLICT).json({ message: "Time overlap with another booking" });
+    }
+
+    const newSlot = await AvailabilitySlot.create({
+      tutorId: tutorId,
+      startUTC: startTime,
+      endUTC: endTime,
+      durationMin: payload.duration,
+      isBooked: true,
+      source: "adhoc"
+    });
+    slotId = newSlot._id;
+  }
+
+  try {
+    const booking = await Booking.create({
+      student: studentId,
+      tutor: tutorId,
+      subject: payload.subject,
+      startTime: startTime,
+      endTime: endTime,
+      duration: payload.duration,
+      price: Math.round((payload.duration / 60) * (tutor.hourlyRate || 0)),
+      notes: payload.notes,
+      status: status,
+      slotId: slotId,
+      meetingRoomId: status === "confirmed" ? `room-${Date.now()}` : undefined
+    });
+
+    // Update slot with booking ID
+    await AvailabilitySlot.findByIdAndUpdate(slotId, { bookingId: booking._id });
+
+    res.status(StatusCodes.CREATED).json({ booking });
+  } catch (error) {
+    // Rollback slot if booking failed
+    if (slotId) {
+      if (slot) { // if it was an existing slot, release it
+        await AvailabilitySlot.findByIdAndUpdate(slotId, { isBooked: false });
+      } else { // if ad-hoc, delete it
+        await AvailabilitySlot.findByIdAndDelete(slotId);
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getStudentBookings(req, res) {
@@ -73,9 +172,9 @@ export async function getMySessions(req, res) {
 
   const now = new Date();
   if (status === "upcoming" || !status) {
-    // For upcoming, show future sessions that are not cancelled or completed
-    query.startTime = { $gte: now };
-    query.status = { $nin: ["cancelled", "completed"] };
+    // For upcoming, show all active sessions regardless of time (so they don't disappear if forgotten)
+    // query.endTime = { $gt: now }; 
+    query.status = { $nin: ["cancelled", "completed", "no-show"] };
   } else if (status === "completed") {
     query.status = "completed";
   } else if (status === "cancelled") {
@@ -101,6 +200,7 @@ export async function getMySessions(req, res) {
       status: booking.status,
       price: booking.price,
       notes: booking.notes,
+      feedback: booking.feedback,
       meetingRoomId: booking.meetingRoomId,
       avatar: role === "student" ? booking.tutor?.avatar : booking.student?.avatar,
     }));
@@ -108,9 +208,9 @@ export async function getMySessions(req, res) {
     res.json({ sessions });
   } catch (error) {
     console.error("Error fetching sessions:", error);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       message: "Failed to fetch sessions",
-      error: error.message 
+      error: error.message
     });
   }
 }
@@ -135,8 +235,14 @@ export async function updateBookingStatus(req, res) {
 
   if (status) {
     booking.status = status;
+    // Release slot if cancelled
+    if (status === "cancelled" && booking.slotId) {
+      await AvailabilitySlot.findByIdAndUpdate(booking.slotId, { isBooked: false, bookingId: null });
+    }
   }
   if (startTime) {
+    // Rescheduling is complex, for now we keep simple update but warn about slot sync
+    // Ideally we should move slots
     const newStartTime = new Date(startTime);
     if (newStartTime <= new Date()) {
       return res.status(StatusCodes.BAD_REQUEST).json({ message: "Start time must be in the future" });
@@ -192,23 +298,57 @@ export async function submitFeedback(req, res) {
     return res.status(StatusCodes.FORBIDDEN).json({ message: "Only students can submit feedback" });
   }
 
-  // Update booking with feedback
+  // Update booking with feedback (Legacy field)
   booking.feedback = { rating, comment, submittedAt: new Date() };
   await booking.save();
 
-  // Update tutor's average rating
+  // Create Review (New Architecture)
+  try {
+    // Find or create Review
+    // Need TutorProfile
+    let tutorProfile = await TutorProfile.findOne({ userId: booking.tutor });
+    if (!tutorProfile) {
+      // If no profile, we can't create a review linked to it. 
+      // (This happens if migration wasn't run). 
+      // We can fallback to just updating User for now.
+    } else {
+      await Review.create({
+        bookingId: booking._id,
+        studentId: booking.student,
+        tutorProfileId: tutorProfile._id,
+        rating,
+        text: comment
+      });
+
+      // Recalculate Rating for TutorProfile
+      const stats = await Review.aggregate([
+        { $match: { tutorProfileId: tutorProfile._id } },
+        { $group: { _id: null, avgRating: { $avg: "$rating" }, count: { $sum: 1 } } }
+      ]);
+
+      if (stats.length > 0) {
+        tutorProfile.rating = Math.round(stats[0].avgRating * 10) / 10;
+        tutorProfile.totalReviews = stats[0].count;
+        await tutorProfile.save();
+      }
+    }
+  } catch (err) {
+    console.error("Failed to create review record:", err);
+  }
+
+  // Update tutor's average rating (Legacy User Model)
   const tutor = await User.findById(booking.tutor);
   if (tutor) {
-    const tutorBookings = await Booking.find({ 
-      tutor: booking.tutor, 
-      "feedback.rating": { $exists: true } 
+    const tutorBookings = await Booking.find({
+      tutor: booking.tutor,
+      "feedback.rating": { $exists: true }
     });
     const totalRating = tutorBookings.reduce((sum, b) => sum + (b.feedback?.rating || 0), 0);
-    const avgRating = totalRating / tutorBookings.length;
-    tutor.rating = avgRating;
+    const avgRating = totalRating / tutorBookings.length; // careful div by zero if length 0
+    tutor.rating = tutorBookings.length > 0 ? avgRating : 0;
     tutor.reviews = tutorBookings.length;
     if (tutor.stats) {
-      tutor.stats.averageRating = avgRating;
+      tutor.stats.averageRating = tutor.rating;
     }
     await tutor.save();
   }

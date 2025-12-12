@@ -11,6 +11,8 @@ const ProfileEdit = ({ user, token, onSave, onCancel }) => {
     hourlyRate: user?.hourlyRate || "",
     expertise: user?.expertise?.join(", ") || "",
     availability: user?.availability?.join(", ") || "",
+    yearsOfExperience: user?.yearsOfExperience || "",
+    availabilityDisplay: user?.availabilityDisplay || "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,6 +29,8 @@ const ProfileEdit = ({ user, token, onSave, onCancel }) => {
       hourlyRate: user?.hourlyRate || "",
       expertise: user?.expertise?.join(", ") || "",
       availability: user?.availability?.join(", ") || "",
+      yearsOfExperience: user?.yearsOfExperience || "",
+      availabilityDisplay: user?.availabilityDisplay || "",
     });
   }, [user]);
 
@@ -104,6 +108,8 @@ const ProfileEdit = ({ user, token, onSave, onCancel }) => {
         profileData.availability = formData.availability
           ? formData.availability.split(",").map((a) => a.trim()).filter(Boolean)
           : [];
+        profileData.yearsOfExperience = formData.yearsOfExperience ? Number(formData.yearsOfExperience) : 0;
+        profileData.availabilityDisplay = formData.availabilityDisplay || "";
       }
 
       await updateProfile(user._id, profileData, token);
@@ -155,15 +161,27 @@ const ProfileEdit = ({ user, token, onSave, onCancel }) => {
                 style={{ display: "none" }}
                 disabled={uploadingImage}
               />
-              <input
-                id="avatar-url"
-                type="text"
-                name="avatar"
-                value={formData.avatar}
-                onChange={handleChange}
-                placeholder="Or enter emoji/URL"
-                className="avatar-url-input"
-              />
+              {!formData.avatar?.startsWith("data:image") && (
+                <input
+                  id="avatar-url"
+                  type="text"
+                  name="avatar"
+                  value={formData.avatar}
+                  onChange={handleChange}
+                  placeholder="Or enter emoji/URL"
+                  className="avatar-url-input"
+                />
+              )}
+              {formData.avatar?.startsWith("data:image") && (
+                <button
+                  type="button"
+                  className="btn-text"
+                  onClick={() => setFormData(prev => ({ ...prev, avatar: "" }))}
+                  style={{ fontSize: '0.8rem', color: '#d32f2f' }}
+                >
+                  Remove Image
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -220,14 +238,39 @@ const ProfileEdit = ({ user, token, onSave, onCancel }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="availability">Availability (comma-separated)</label>
+              <label htmlFor="yearsOfExperience">Years of Experience</label>
+              <input
+                id="yearsOfExperience"
+                type="number"
+                name="yearsOfExperience"
+                value={formData.yearsOfExperience}
+                onChange={handleChange}
+                min="0"
+                placeholder="e.g. 5"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="availabilityDisplay">Availability (Text Display)</label>
+              <input
+                id="availabilityDisplay"
+                type="text"
+                name="availabilityDisplay"
+                value={formData.availabilityDisplay}
+                onChange={handleChange}
+                placeholder="e.g. Mon-Fri 9am-5pm"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="availability">Availability Tags (comma-separated)</label>
               <input
                 id="availability"
                 type="text"
                 name="availability"
                 value={formData.availability}
                 onChange={handleChange}
-                placeholder="Monday-Friday, Weekends"
+                placeholder="Weekends, Evenings"
               />
             </div>
           </>

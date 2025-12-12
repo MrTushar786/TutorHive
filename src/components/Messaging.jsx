@@ -3,7 +3,7 @@ import "./Messaging.css";
 import { createWSClient } from "../utils/wsClient";
 
 // Messaging component
-function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation }) {
+function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation, onMarkAsRead }) {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messageText, setMessageText] = useState("");
   const [messages, setMessages] = useState([]);
@@ -133,16 +133,27 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
               <div
                 key={conv.id}
                 className={`conversation-item ${selectedConversation?.id === conv.id ? "active" : ""}`}
-                onClick={() => setSelectedConversation(conv)}
+                onClick={() => {
+                  setSelectedConversation(conv);
+                  if (conv.unreadCount > 0 && onMarkAsRead) {
+                    onMarkAsRead(conv.id);
+                  }
+                }}
               >
-                <div className="conversation-avatar">{conv.avatar || "👤"}</div>
+                <div className="conversation-avatar">
+                  {conv.avatar?.startsWith("data:") || conv.avatar?.startsWith("http") ? (
+                    <img src={conv.avatar} alt={conv.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  ) : (
+                    conv.avatar || "👤"
+                  )}
+                </div>
                 <div className="conversation-info">
                   <div className="conversation-name">{conv.name}</div>
                   <div className="conversation-preview">
                     {conv.lastMessage || "No messages yet"}
                   </div>
                 </div>
-                {conv.unreadCount > 0 && (
+                {conv.unreadCount > 0 && selectedConversation?.id !== conv.id && (
                   <div className="unread-badge">{conv.unreadCount}</div>
                 )}
                 {/* Delete chat button on list item */}
@@ -167,7 +178,13 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
         {selectedConversation ? (
           <>
             <div className="chat-header">
-              <div className="chat-header-avatar">{selectedConversation.avatar || "👤"}</div>
+              <div className="chat-header-avatar">
+                {selectedConversation.avatar?.startsWith("data:") || selectedConversation.avatar?.startsWith("http") ? (
+                  <img src={selectedConversation.avatar} alt={selectedConversation.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : (
+                  selectedConversation.avatar || "👤"
+                )}
+              </div>
               <div className="chat-header-info">
                 <div className="chat-header-name">{selectedConversation.name}</div>
                 <div className={`chat-header-status ${wsConnected ? "online" : "offline"}`}>

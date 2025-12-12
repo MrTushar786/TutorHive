@@ -72,10 +72,12 @@
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -167,6 +169,7 @@
   border: 3px solid white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   background: #000;
+  z-index: 20;
 }
 
 .local-video {
@@ -303,4 +306,3 @@
     font-size: 1rem;
   }
 }
-

@@ -18,7 +18,7 @@ const socketMetadata = new Map();
  */
 function verifyToken(socket) {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace("Bearer ", "");
-  
+
   if (!token) {
     console.log("No token provided in socket handshake");
     return null;
@@ -29,12 +29,12 @@ function verifyToken(socket) {
     // Extract user ID from subject (sub) field, same as auth middleware
     const userId = decoded.sub || decoded.id || decoded._id;
     const role = decoded.role;
-    
+
     if (!userId) {
       console.log("Token decoded but no user ID found");
       return null;
     }
-    
+
     console.log(`Token verified: userId=${userId}, role=${role}`);
     return { id: userId.toString(), role };
   } catch (error) {
@@ -49,9 +49,9 @@ function verifyToken(socket) {
 async function verifyBookingAccess(userId, bookingId, role) {
   try {
     console.log(`Verifying booking access: userId=${userId}, bookingId=${bookingId}, role=${role}`);
-    
+
     const booking = await Booking.findById(bookingId).populate("student tutor");
-    
+
     if (!booking) {
       console.log(`Booking ${bookingId} not found`);
       return { authorized: false, reason: "Booking not found" };
@@ -99,10 +99,16 @@ async function verifyBookingAccess(userId, bookingId, role) {
  * Initialize Socket.IO server with booking-based authorization
  */
 export function setupVideoSocket(server) {
+  const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim())
+    : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"];
+
+  console.log("Video Socket allowed origins:", allowedOrigins);
+
   const io = new Server(server, {
     path: "/bridge",
     cors: {
-      origin: process.env.CLIENT_URL?.split(",") || ["http://localhost:5173", "http://localhost:3000", "*"],
+      origin: allowedOrigins,
       credentials: true,
       methods: ["GET", "POST"],
     },
@@ -130,7 +136,7 @@ export function setupVideoSocket(server) {
 
   io.on("connection", async (socket) => {
     console.log(`Socket connected: ${socket.id}`);
-    
+
     // Verify authentication on connection
     const user = verifyToken(socket);
     if (!user) {
@@ -162,7 +168,7 @@ export function setupVideoSocket(server) {
 
       // Verify booking access
       const access = await verifyBookingAccess(socket.user.id, bookingId, role);
-      
+
       if (!access.authorized) {
         socket.emit("error", { message: access.reason });
         return;
@@ -292,7 +298,7 @@ export function setupVideoSocket(server) {
         // Remove from room tracking
         if (activeRooms.has(roomId)) {
           activeRooms.get(roomId).delete(socket.id);
-          
+
           if (activeRooms.get(roomId).size === 0) {
             activeRooms.delete(roomId);
           } else {

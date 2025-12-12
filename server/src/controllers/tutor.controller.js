@@ -1,6 +1,8 @@
 import { StatusCodes } from "http-status-codes";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
+import TutorProfile from "../models/TutorProfile.js";
+import Review from "../models/Review.js";
 
 function mapTutorSession(booking) {
   return {
@@ -26,6 +28,9 @@ export async function getDashboard(req, res) {
     return res.status(StatusCodes.NOT_FOUND).json({ message: "Tutor not found" });
   }
 
+  // Get Profile
+  const tutorProfile = await TutorProfile.findOne({ userId: tutorId }) || {};
+
   const bookings = await Booking.find({ tutor: tutorId })
     .populate("student", "name avatar stats")
     .sort({ startTime: 1 });
@@ -38,12 +43,25 @@ export async function getDashboard(req, res) {
     if (booking.student) {
       const current = studentsMap.get(booking.student._id?.toString()) ?? {
         ...booking.student.toJSON(),
+        id: booking.student._id,
         sessions: 0,
+        totalEarnings: 0,
+        totalHours: 0,
         progress: Math.round(Math.random() * 30 + 60),
         lastSession: booking.startTime,
       };
+
       current.sessions += 1;
-      current.lastSession = booking.startTime;
+      // Update lastSession to the latest one encountered
+      if (new Date(booking.startTime) > new Date(current.lastSession)) {
+        current.lastSession = booking.startTime;
+      }
+
+      if (booking.status === 'completed') {
+        current.totalEarnings += (booking.price || 0);
+        current.totalHours += (booking.duration || 0) / 60;
+      }
+
       studentsMap.set(booking.student._id.toString(), current);
     }
   });
@@ -53,22 +71,26 @@ export async function getDashboard(req, res) {
   const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
   const totalStudents = studentsMap.size;
   const completedSessions = completedBookings.length;
-  
-  // Calculate average rating from feedback
-  const bookingsWithFeedback = completedBookings.filter((b) => b.feedback?.rating);
-  const averageRating = bookingsWithFeedback.length > 0
-    ? bookingsWithFeedback.reduce((sum, b) => sum + (b.feedback.rating || 0), 0) / bookingsWithFeedback.length
-    : tutor.rating || 0;
 
-  // Update tutor stats
-  if (!tutor.stats) {
-    tutor.stats = {};
+  // Get ratings from Reviews specifically (fallback to profile aggregate)
+  let averageRating = tutorProfile.rating || 0;
+  if (!tutorProfile.rating) {
+    // Use reviews directly if aggregate missing
+    const bookingsWithFeedback = completedBookings.filter((b) => b.feedback?.rating);
+    if (bookingsWithFeedback.length > 0) {
+      averageRating = bookingsWithFeedback.reduce((sum, b) => sum + (b.feedback.rating || 0), 0) / bookingsWithFeedback.length;
+    }
   }
-  tutor.stats.totalStudents = totalStudents;
-  tutor.stats.completedSessions = completedSessions;
-  tutor.stats.totalEarnings = totalEarnings;
-  tutor.stats.averageRating = averageRating;
-  await tutor.save();
+
+  // Check if we need to sync stats back to Profile
+  // (We do this to keep Profile denormalized stats fresh)
+  if (tutorProfile.stats) {
+    tutorProfile.stats.totalStudents = totalStudents;
+    tutorProfile.stats.completedLessons = completedSessions;
+    tutorProfile.stats.totalEarnings = totalEarnings;
+    // We don't save here to avoid heavy writes on reading dashboard, 
+    // but you could add a 'lastUpdated' check.
+  }
 
   const earningsByMonth = completedBookings.reduce((acc, booking) => {
     const monthKey = booking.startTime.toLocaleString("default", { month: "short", year: "numeric" });
@@ -86,8 +108,15 @@ export async function getDashboard(req, res) {
     icon: booking.status === "completed" ? "✅" : "📅",
   }));
 
+  // Merge Generic User data with Profile data
+  const mergedTutor = {
+    ...tutor.toJSON(),
+    ...tutorProfile.toJSON(),
+    _id: tutor._id // prioritize user ID
+  };
+
   res.json({
-    tutor,
+    tutor: mergedTutor,
     upcomingSessions,
     myStudents: Array.from(studentsMap.values()),
     earningsHistory: Object.entries(earningsByMonth)
@@ -102,18 +131,30 @@ export async function getDashboard(req, res) {
 }
 
 export async function listTutors(_req, res) {
-  const tutors = await User.find({ role: "tutor" }).sort({ "stats.averageRating": -1 });
-  res.json({
-    tutors: tutors.map((tutor) => ({
-      id: tutor._id,
-      name: tutor.name,
-      subjects: tutor.subjects,
-      hourlyRate: tutor.hourlyRate,
-      rating: tutor.rating,
-      reviews: tutor.reviews,
-      expertise: tutor.expertise,
-      availability: tutor.availability,
-    })),
-  });
+  // Query TutorProfiles directly for efficient listing
+  // Sort by rating desc
+  const profiles = await TutorProfile.find().sort({ rating: -1 }).populate("userId", "name avatar");
+
+  const tutors = profiles.map(profile => {
+    // If user deleted but profile exists, skip?
+    if (!profile.userId) return null;
+    const user = profile.userId; // populated
+    return {
+      id: user._id, // Client expects Tutor ID to be User ID for now
+      name: user.name,
+      avatar: user.avatar,
+      subjects: profile.subjects,
+      hourlyRate: profile.hourlyRate,
+      rating: profile.rating,
+      reviews: profile.totalReviews,
+      expertise: profile.expertise,
+      headline: profile.headline,
+      city: profile.city,
+      experience: profile.yearsOfExperience ? `${profile.yearsOfExperience}+ years` : "New",
+      availability: profile.availabilityDisplay || "Flexible"
+    };
+  }).filter(t => t !== null);
+
+  res.json({ tutors });
 }
 

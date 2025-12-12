@@ -23,6 +23,10 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  deletedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }]
 });
 
 export default mongoose.model("Message", messageSchema);

@@ -1,10 +1,11 @@
 import { WebSocketServer } from "ws";
 import Message from "../models/Message.js";
+import Conversation from "../models/Conversation.js";
 
 const conversations = new Map(); // conversationId -> Set of WebSocket connections
 
-export function setupMessageWebSocketServer(server) {
-  const wss = new WebSocketServer({ server, path: "/ws/messages" });
+export function createMessageWebSocketServer() {
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -56,6 +57,39 @@ export function setupMessageWebSocketServer(server) {
             text: data.text,
           });
           await newMessage.save();
+
+          // Update Conversation document
+          try {
+            // Check if conversation exists, if not create it
+            // Participants are derived from conversationId "conv-user1-user2"
+            const parts = conversationId.split("-");
+            const participants = [parts[1], parts[2]];
+
+            // NOTE: Dynamic import to avoid circular dependency issues if any, though standard import is fine usually. 
+            // We use standard import in this file usually. Let's assume imported at top.
+            // Using logic: update or create.
+
+            await Conversation.findOneAndUpdate(
+              { conversationId },
+              {
+                $set: {
+                  lastMessage: {
+                    text: data.text,
+                    sender: userId,
+                    createdAt: new Date(),
+                  },
+                  participants: participants
+                },
+                $inc: {
+                  [`unreadCounts.${participants.find(p => p !== userId)}`]: 1
+                },
+                $pull: { hiddenFor: { $in: participants } } // Un-hide for everyone involved
+              },
+              { upsert: true, new: true }
+            );
+          } catch (err) {
+            console.error("Error updating conversation model:", err);
+          }
 
           const messageObj = {
             id: newMessage._id.toString(),

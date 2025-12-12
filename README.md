@@ -1,98 +1,148 @@
-# TutorHive platform
+# TutorHive Platform
 
-TutorHive is a production-ready full-stack learning marketplace that pairs an immersive React/Vite frontend with a secure Node.js + MongoDB backend. Students can discover tutors, book sessions in real time, and tutors get a unified workspace to manage their learners.
+TutorHive is a comprehensive, production-ready learning marketplace that connects students with expert tutors. It combines a modern, immersive React/Vite frontend with a robust Node.js + MongoDB backend, featuring advanced real-time capabilities for messaging and video calls.
 
-## Stack
+## 🚀 Features
 
-| Layer | Tech |
-| --- | --- |
-| Frontend | React 19, Vite, React Router, Three.js hero visuals |
-| Backend | Node.js, Express, Mongoose, JWT auth, Zod validation |
-| Database | MongoDB |
-| Tooling | ESLint, Nodemon (API dev), Vite build pipeline |
+- **User Authentication**: Secure JWT-based authentication for Students and Tutors.
+- **Dynamic Dashboards**: Personalized dashboards for students to manage bookings and for tutors to manage their classes.
+- **Real-time Messaging**: Instant messaging system between students and tutors using WebSockets (`/ws/messages`).
+- **Video Calling**: Enterprise-grade video conferencing with WebRTC and Socket.IO (`/bridge`), supporting screen sharing and peer-to-peer connection.
+- **Booking System**: Complete workflow for scheduling, confirming, and managing tutoring sessions.
+- **Search & Discovery**: Find tutors by subject, availability, and rating.
+- **Responsive Design**: Fully responsive UI providing a seamless experience across desktop and mobile devices.
 
-## Prerequisites
+## 🛠 Tech Stack
 
-- Node.js 20+
-- npm 10+
-- A running MongoDB instance (local or Atlas)
+### Frontend
+- **Framework**: React 19 + Vite
+- **Styling**: Vanilla CSS (Custom Glassmorphism Design System)
+- **Routing**: React Router 7
+- **Visuals**: Three.js (@react-three/fiber) for 3D hero elements
+- **State/Data**: Context API + Custom Hooks
 
-## Environment variables
+### Backend
+- **Runtime**: Node.js + Express
+- **Database**: MongoDB (Mongoose ODM)
+- **Real-time**: 
+  - **Native WebSockets (`ws`)**: For text messaging.
+  - **Socket.IO**: For video call signaling and rooms.
+- **Security**: Helmet, CORS, JWT-based Route Protection
+- **Validation**: Zod + Custom Middleware
 
-Create the following files based on your environment.
+## 📋 Prerequisites
 
-### Frontend (`.env` in the project root)
+- **Node.js**: v20 or higher
+- **npm**: v10 or higher
+- **MongoDB**: Local instance running on port 27017 or a MongoDB Atlas URI.
 
-```
+## ⚙️ Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository_url>
+    cd TutorHive1
+    ```
+
+2.  **Install Frontend Dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Install Backend Dependencies:**
+    ```bash
+    cd server
+    npm install
+    cd ..
+    ```
+
+## 🔧 Configuration
+
+Create environment configuration files in the appropriate directories.
+
+### Frontend (`.env`)
+Create a `.env` file in the root directory:
+```env
 VITE_API_URL=http://localhost:5000
 ```
+*Note: If testing on a mobile device on the same network, change `localhost` to your PC's local IP address.*
 
 ### Backend (`server/.env`)
-
-```
+Create a `.env` file in the `server` directory:
+```env
 PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/tutorhive
-JWT_SECRET=replace-this-with-a-strong-secret
-CLIENT_URL=http://localhost:5173
+JWT_SECRET=your_super_secure_jwt_secret_key_here
+CLIENT_URL=http://localhost:5173,http://192.168.1.X:5173
 ```
+*Note: Add your local IP to `CLIENT_URL` to allow CORS requests from mobile devices.*
 
-## Installation
+## 🏃‍♂️ Running the Application
 
+To run the full stack (frontend + backend), you will need two terminal windows.
+
+### 1. Start the Backend Server
+This runs the API, WebSocket server, and Socket.IO signaling server.
 ```bash
-# Frontend deps
-npm install
-
-# Backend deps
 cd server
-npm install
+npm run dev
 ```
+*Server runs on port 5000.*
 
-## Database seed (optional but recommended)
+### 2. Start the Frontend Development Server
+The frontend is configured to run with host access enabled, allowing other devices on the network to connect.
+```bash
+npm run dev
+```
+*Frontend runs on http://localhost:5173 (and your local network IP).*
 
-The backend ships with a seeding utility that creates demo tutors, students, and bookings:
+## 📱 Testing on Mobile / Network
+
+1.  Find your computer's local IP address (e.g., `192.168.1.5`).
+2.  Update `VITE_API_URL` in the **frontend** `.env` to this IP: `http://192.168.1.5:5000`.
+3.  Update `CLIENT_URL` in the **backend** `server/.env` to include your frontend IP: `http://192.168.1.5:5173`.
+4.  Restart both servers.
+5.  Open `http://192.168.1.5:5173` on your mobile browser.
+
+## 💾 Database Seeding
+
+To verify the app with sample data (mock tutors, students, and bookings):
 
 ```bash
 cd server
 npm run seed
 ```
 
-## Development workflow
+## 📂 Project Structure
 
-Open two terminals:
-
-```bash
-# Terminal 1 – frontend
-npm run dev
-
-# Terminal 2 – backend
-cd server
-npm run dev
+```
+TutorHive1/
+├── public/              # Static assets
+├── src/
+│   ├── api/             # API client functions
+│   ├── auth/            # Auth pages (Login/Signup)
+│   ├── components/      # Reusable UI components (Messaging, VideoCall, etc.)
+│   ├── context/         # React Contexts (Auth, Data)
+│   ├── hooks/           # Custom React Hooks
+│   ├── pages/           # Main Page Views
+│   ├── server/          # Backend Source Code
+│   │   ├── config/      # DB Connection
+│   │   ├── controllers/ # Route Logic
+│   │   ├── models/      # Mongoose Schemas
+│   │   ├── routes/      # efficient Express Routes
+│   │   ├── websocket/   # WebSocket & Socket.IO Handlers
+│   │   └── server.js    # Entry Point
+│   └── utils/           # Helper functions & Socket Clients
+└── package.json         # Project Dependencies
 ```
 
-The frontend expects the API at `VITE_API_URL`, so keep both servers running.
+## 🤝 Contributing
 
-## Production build
+1.  Fork the repository.
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
-```bash
-npm run build           # frontend build (outputs to dist/)
-cd server && npm start  # run API in production mode
-```
-
-Serve the `/dist` folder through your static host (Netlify, Vercel, S3, etc.) and deploy `server/` to your Node platform of choice. Be sure to set the same environment variables in production.
-
-## Testing & linting
-
-```bash
-npm run lint        # frontend lint
-cd server && npm run dev  # API with Nodemon + ESLint on save
-```
-
-## Feature highlights
-
-- Password-based auth with JWT + protected Express routes
-- Student & tutor dashboards powered by live API data
-- Session booking workflow backed by MongoDB
-- 3D hero animations and fully responsive UI
-- Shared loading/error states and secure route guards
-
-Feel free to extend the API (e.g., messaging, payments) or plug in your own AI-driven tutor matching—everything is structured for easy iteration. Happy hacking! 🎓🐝
+---
+Happy Hacking! 🎓🐝

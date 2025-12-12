@@ -27,7 +27,7 @@ class PeerConnection extends Emitter {
    */
   setupPeerConnection() {
     const iceServers = getIceServers();
-    
+
     this.pc = new RTCPeerConnection({
       iceServers,
       iceCandidatePoolSize: 10,
@@ -59,7 +59,7 @@ class PeerConnection extends Emitter {
     // Handle connection state changes
     this.pc.onconnectionstatechange = () => {
       this.emit("connectionStateChange", this.pc.connectionState);
-      
+
       if (this.pc.connectionState === "failed") {
         this.emit("error", new Error("Connection failed"));
       }
@@ -78,22 +78,20 @@ class PeerConnection extends Emitter {
   async start(mediaOptions = {}) {
     try {
       console.log("Starting media devices...");
-      // Start media device
-      await this.mediaDevice.start(mediaOptions);
 
-      // Wait for stream
-      return new Promise((resolve, reject) => {
+      return new Promise(async (resolve, reject) => {
+        // Setup listeners before starting media to avoid race condition
         this.mediaDevice.on("stream", async (stream) => {
           console.log("Media stream obtained, adding tracks to peer connection");
-          
+
           // Add tracks to peer connection
           stream.getTracks().forEach((track) => {
             console.log(`Adding track: ${track.kind}, enabled: ${track.enabled}`);
             this.pc.addTrack(track, stream);
           });
-          
+
           this.emit("localStream", stream);
-          
+
           // If caller, create offer after tracks are added
           if (this.isCaller) {
             // Wait a bit for tracks to be properly added
@@ -118,6 +116,9 @@ class PeerConnection extends Emitter {
           this.emit("error", error);
           reject(error);
         });
+
+        // Start media device
+        await this.mediaDevice.start(mediaOptions);
       });
     } catch (error) {
       console.error("Error starting media:", error);
@@ -136,7 +137,7 @@ class PeerConnection extends Emitter {
     }
 
     this.mediaDevice.stop();
-    
+
     if (this.pc) {
       this.pc.close();
       this.pc = null;
@@ -152,19 +153,19 @@ class PeerConnection extends Emitter {
   async createOffer() {
     try {
       const offer = await this.pc.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true,
-    });
-      
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
       await this.pc.setLocalDescription(offer);
-      
+
       if (this.socket) {
         this.socket.emit("call-offer", {
           bookingId: this.bookingId,
           offer,
         });
       }
-      
+
       return this;
     } catch (error) {
       this.emit("error", error);
@@ -182,10 +183,10 @@ class PeerConnection extends Emitter {
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
       });
-      
+
       console.log("Setting local description (answer)...");
       await this.pc.setLocalDescription(answer);
-      
+
       if (this.socket && this.socket.connected) {
         console.log("Sending answer to peer...");
         this.socket.emit("call-answer", {
@@ -195,7 +196,7 @@ class PeerConnection extends Emitter {
       } else {
         console.error("Socket not connected, cannot send answer");
       }
-      
+
       return this;
     } catch (error) {
       console.error("Error creating answer:", error);

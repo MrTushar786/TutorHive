@@ -55,8 +55,31 @@ export default function StudentDashboard() {
   const [rescheduleDialog, setRescheduleDialog] = useState(null);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const { user, token, logout } = useAuth();
-  const [deletedConvIds, setDeletedConvIds] = useState([]);
+  const [deletedConvIds, setDeletedConvIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem("deletedConvIds");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("deletedConvIds", JSON.stringify(deletedConvIds));
+  }, [deletedConvIds]);
   const [realConversations, setRealConversations] = useState([]);
+
+  // Restore conversation if it reappears from backend (e.g. new message received)
+  useEffect(() => {
+    if (realConversations.length > 0 && deletedConvIds.length > 0) {
+      const activeRealIds = new Set(realConversations.map(c => c.id));
+      const newDeletedIds = deletedConvIds.filter(id => !activeRealIds.has(id));
+
+      if (newDeletedIds.length !== deletedConvIds.length) {
+        setDeletedConvIds(newDeletedIds);
+      }
+    }
+  }, [realConversations, deletedConvIds]);
 
   const loadDashboard = useCallback(async () => {
     if (!user?._id) return;
@@ -89,7 +112,10 @@ export default function StudentDashboard() {
     try {
       const response = await getMySessions(sessionsFilter, token);
       console.log("Sessions response:", response);
-      const sessionsData = response?.sessions || response?.data?.sessions || response || [];
+      // Backend returns { sessions: [...] } or just array?
+      // Based on controller, it returns { sessions: [...] }
+      const sessionsData = response?.sessions || response || [];
+      console.log("Setting sessions state to:", sessionsData);
       setSessions(Array.isArray(sessionsData) ? sessionsData : []);
     } catch (err) {
       console.error("Error loading sessions:", err);
@@ -123,6 +149,8 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (activeTab === "messages") {
       loadConversations();
+      const interval = setInterval(loadConversations, 5000); // Poll every 5s for new chats
+      return () => clearInterval(interval);
     }
   }, [activeTab, loadConversations]);
 
@@ -335,7 +363,13 @@ export default function StudentDashboard() {
 
         <div className="sidebar-footer">
           <div className="user-profile">
-            <div className="user-avatar">{studentProfile?.avatar || "👨‍🎓"}</div>
+            <div className="user-avatar">
+              {studentProfile?.avatar?.startsWith("data:") || studentProfile?.avatar?.startsWith("http") ? (
+                <img src={studentProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                studentProfile?.avatar || "👨‍🎓"
+              )}
+            </div>
             <div className="user-info">
               <div className="user-name">{studentProfile?.name}</div>
               <div className="user-email">{studentProfile?.email}</div>
@@ -414,7 +448,13 @@ export default function StudentDashboard() {
                 <div className="sessions-list">
                   {upcomingSessions.map((session) => (
                     <div key={session.id} className="session-item">
-                      <div className="session-avatar">{session.avatar || "👩‍🏫"}</div>
+                      <div className="session-avatar">
+                        {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
+                          <img src={session.avatar} alt="Tutor" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        ) : (
+                          session.avatar || "👩‍🏫"
+                        )}
+                      </div>
                       <div className="session-details">
                         <div className="session-tutor">{session.tutor}</div>
                         <div className="session-subject">{session.subject}</div>
@@ -483,7 +523,13 @@ export default function StudentDashboard() {
               {filteredTutors.map((tutor) => (
                 <div key={tutor.id} className="tutor-card">
                   <div className="tutor-card-header">
-                    <div className="tutor-avatar-large">{tutor.avatar || "👩‍🏫"}</div>
+                    <div className="tutor-avatar-large">
+                      {tutor.avatar?.startsWith("data:") || tutor.avatar?.startsWith("http") ? (
+                        <img src={tutor.avatar} alt={tutor.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      ) : (
+                        tutor.avatar || "👩‍🏫"
+                      )}
+                    </div>
                     <div className="tutor-rating">
                       <span className="star">⭐</span>
                       <span className="rating-value">{tutor.rating}</span>
@@ -511,7 +557,7 @@ export default function StudentDashboard() {
                   </div>
                   <div className="tutor-card-footer">
                     <div className="tutor-price">
-                      <span className="price-amount">${tutor.hourlyRate}</span>
+                      <span className="price-amount">${tutor.hourlyRate || 0}</span>
                       <span className="price-unit">/hour</span>
                     </div>
                     <button className="book-btn" onClick={() => openBookingModal(tutor)}>
@@ -578,7 +624,13 @@ export default function StudentDashboard() {
                       <div className="session-main-info">
                         <h3>{session.subject}</h3>
                         <div className="session-tutor-info">
-                          <span className="tutor-avatar-small">{session.avatar || "👩‍🏫"}</span>
+                          <span className="tutor-avatar-small">
+                            {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
+                              <img src={session.avatar} alt="Tutor" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : (
+                              session.avatar || "👩‍🏫"
+                            )}
+                          </span>
                           <span>{session.tutor}</span>
                         </div>
                       </div>
@@ -596,6 +648,16 @@ export default function StudentDashboard() {
                           <span>${session.price}</span>
                         </div>
                       </div>
+                      {session.feedback && (
+                        <div className="session-feedback" style={{ marginTop: '1rem', padding: '0.5rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                          <div className="feedback-rating" style={{ color: '#FFD700' }}>{"⭐".repeat(session.feedback.rating)}</div>
+                          {session.feedback.comment && (
+                            <div className="feedback-comment" style={{ fontStyle: 'italic', fontSize: '0.9rem', color: '#666' }}>
+                              "{session.feedback.comment}"
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="session-card-right">
                       <span className={`status-badge ${session.status}`}>{session.status}</span>
@@ -756,14 +818,34 @@ export default function StudentDashboard() {
                       };
                     })
                     .filter(Boolean);
-                  
+
                   return [...realConversations, ...potentialConversations].filter(c => !deletedConvIds.includes(c.id));
                 })()}
                 onSendMessage={(conversationId, message) => {
                   console.log("Sending message:", conversationId, message);
                 }}
-                onDeleteConversation={(convId) => {
+                onDeleteConversation={async (convId) => {
+                  // Always hide locally first (persistent)
                   setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
+                  // If it's a real conversation, tell backend
+                  try {
+                    await import("../api/messages").then(m => m.deleteChat(convId, token));
+                    setRealConversations(prev => prev.filter(c => c.id !== convId));
+                  } catch (e) {
+                    // Ignore 404s or errors for potential convs
+                  }
+                }}
+                onMarkAsRead={async (convId) => {
+                  // Optimistically update local state
+                  setRealConversations(prev => prev.map(c =>
+                    c.id === convId ? { ...c, unreadCount: 0 } : c
+                  ));
+                  // Call backend
+                  try {
+                    await import("../api/messages").then(m => m.markAsRead(convId, token));
+                  } catch (e) {
+                    console.error("Failed to mark as read", e);
+                  }
                 }}
               />
             </ErrorBoundary>
@@ -815,7 +897,13 @@ export default function StudentDashboard() {
               ×
             </button>
             <div className="modal-header">
-              <div className="modal-tutor-avatar">{selectedTutor.avatar || "👩‍🏫"}</div>
+              <div className="modal-tutor-avatar">
+                {selectedTutor.avatar?.startsWith("data:") || selectedTutor.avatar?.startsWith("http") ? (
+                  <img src={selectedTutor.avatar} alt={selectedTutor.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : (
+                  selectedTutor.avatar || "👩‍🏫"
+                )}
+              </div>
               <div>
                 <h2>Book Session with {selectedTutor.name}</h2>
                 <p className="modal-subject">{selectedTutor.subject}</p>
@@ -856,8 +944,7 @@ export default function StudentDashboard() {
                   >
                     {DURATION_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label} - $
-                        {Math.round(((selectedTutor.hourlyRate || 0) / 60) * option.value)}
+                        {option.label} - ${Math.round(((selectedTutor.hourlyRate || 0) / 60) * option.value)}
                       </option>
                     ))}
                   </select>

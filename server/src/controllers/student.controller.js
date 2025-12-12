@@ -62,22 +62,25 @@ export async function getDashboard(req, res) {
     lessons: data.lessons,
   }));
 
-  const tutors = await User.find({ role: "tutor" })
-    .limit(12)
-    .sort({ "stats.averageRating": -1 });
+  // Fetch tutors logic updated to use TutorProfile
+  const tutorProfiles = await import("../models/TutorProfile.js").then(m => m.default.find().limit(12).sort({ rating: -1 }).populate("userId"));
 
-  const tutorsResponse = tutors.map((tutor) => ({
-    id: tutor._id,
-    name: tutor.name,
-    subject: tutor.subjects?.[0] ?? "General",
-    rating: tutor.rating,
-    reviews: tutor.reviews,
-    hourlyRate: tutor.hourlyRate,
-    experience: `${Math.floor(Math.random() * 8 + 5)}+ years`,
-    avatar: tutor.avatar ?? "👨‍🏫",
-    expertise: tutor.expertise,
-    availability: tutor.availability?.join(", ") ?? "Flexible",
-  }));
+  const tutorsResponse = tutorProfiles.map((tp) => {
+    if (!tp.userId) return null;
+    const u = tp.userId;
+    return {
+      id: u._id,
+      name: u.name,
+      subject: tp.subjects?.[0] ?? "General",
+      rating: tp.rating,
+      reviews: tp.totalReviews,
+      hourlyRate: tp.hourlyRate,
+      experience: tp.yearsOfExperience ? `${tp.yearsOfExperience}+ years` : "New",
+      avatar: u.avatar ?? "👨‍🏫",
+      expertise: tp.expertise,
+      availability: tp.availabilityDisplay || "Flexible",
+    };
+  }).filter(t => t !== null);
 
   // Compute overall stats from bookings for dynamic progress
   const totalLessons = bookings.length;
