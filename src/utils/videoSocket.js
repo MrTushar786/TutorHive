@@ -23,8 +23,12 @@ export function initVideoSocket(token) {
     return socketInstance;
   }
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const url = apiUrl.replace(/\/$/, "");
+  let apiUrl = import.meta.env.VITE_API_URL;
+  // If no API URL set (dev mode), derive from current location but target port 5000
+  if (!apiUrl && typeof window !== "undefined") {
+    apiUrl = `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  const url = (apiUrl || "").replace(/\/$/, "");
 
   console.log("Initializing video socket to:", url, "path: /bridge");
 
@@ -33,7 +37,7 @@ export function initVideoSocket(token) {
     auth: {
       token,
     },
-    transports: ["polling", "websocket"], // Try polling first, then websocket
+    transports: ["polling", "websocket"], // Allow both now that we connect directly to backend
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 10,

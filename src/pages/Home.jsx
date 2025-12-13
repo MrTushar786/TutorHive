@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import '../css/App.css';
 import { useNavigate } from 'react-router-dom';
 
-export default function Home(){
+export default function Home() {
   const canvasRef = useRef(null);
   const [activeSection, setActiveSection] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -14,12 +14,12 @@ export default function Home(){
     // Three.js Scene Setup with Better Educational 3D Models
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ 
-      canvas: canvasRef.current, 
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasRef.current,
       alpha: true,
-      antialias: true 
+      antialias: true
     });
-    
+
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     camera.position.z = 12;
@@ -27,17 +27,17 @@ export default function Home(){
     // Create Pencil
     const createPencil = () => {
       const group = new THREE.Group();
-      
+
       // Wooden body
       const bodyGeom = new THREE.CylinderGeometry(0.15, 0.15, 2.5, 6);
-      const bodyMat = new THREE.MeshPhongMaterial({ 
+      const bodyMat = new THREE.MeshPhongMaterial({
         color: 0xFFD700,
         flatShading: true
       });
       const body = new THREE.Mesh(bodyGeom, bodyMat);
       body.rotation.z = Math.PI / 2;
       group.add(body);
-      
+
       // Tip
       const tipGeom = new THREE.ConeGeometry(0.15, 0.4, 6);
       const tipMat = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
@@ -45,7 +45,7 @@ export default function Home(){
       tip.rotation.z = -Math.PI / 2;
       tip.position.x = 1.45;
       group.add(tip);
-      
+
       // Eraser
       const eraserGeom = new THREE.CylinderGeometry(0.17, 0.17, 0.3, 6);
       const eraserMat = new THREE.MeshPhongMaterial({ color: 0xFF69B4 });
@@ -53,7 +53,7 @@ export default function Home(){
       eraser.rotation.z = Math.PI / 2;
       eraser.position.x = -1.35;
       group.add(eraser);
-      
+
       return group;
     };
 
@@ -61,10 +61,10 @@ export default function Home(){
     const createBookStack = () => {
       const group = new THREE.Group();
       const colors = [0xFF6B35, 0x4A90E2, 0x9C27B0];
-      
+
       for (let i = 0; i < 3; i++) {
         const bookGeom = new THREE.BoxGeometry(1.2, 0.3, 1.6);
-        const bookMat = new THREE.MeshPhongMaterial({ 
+        const bookMat = new THREE.MeshPhongMaterial({
           color: colors[i],
           flatShading: true
         });
@@ -73,34 +73,34 @@ export default function Home(){
         book.rotation.y = (Math.random() - 0.5) * 0.3;
         group.add(book);
       }
-      
+
       return group;
     };
 
     // Create Apple (Teacher's desk classic)
     const createApple = () => {
       const group = new THREE.Group();
-      
+
       // Apple body
       const appleGeom = new THREE.SphereGeometry(0.5, 32, 32);
-      const appleMat = new THREE.MeshPhongMaterial({ 
+      const appleMat = new THREE.MeshPhongMaterial({
         color: 0xFF0000,
         shininess: 100
       });
       const apple = new THREE.Mesh(appleGeom, appleMat);
       apple.scale.y = 0.9;
       group.add(apple);
-      
+
       // Stem
       const stemGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
       const stemMat = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
       const stem = new THREE.Mesh(stemGeom, stemMat);
       stem.position.y = 0.6;
       group.add(stem);
-      
+
       // Leaf
       const leafGeom = new THREE.CircleGeometry(0.2, 8);
-      const leafMat = new THREE.MeshPhongMaterial({ 
+      const leafMat = new THREE.MeshPhongMaterial({
         color: 0x228B22,
         side: THREE.DoubleSide
       });
@@ -108,64 +108,64 @@ export default function Home(){
       leaf.position.set(0.15, 0.65, 0);
       leaf.rotation.y = Math.PI / 4;
       group.add(leaf);
-      
+
       return group;
     };
 
     // Create Diploma Roll
     const createDiploma = () => {
       const group = new THREE.Group();
-      
+
       // Paper roll
       const rollGeom = new THREE.CylinderGeometry(0.15, 0.15, 1.5, 32);
-      const rollMat = new THREE.MeshPhongMaterial({ 
+      const rollMat = new THREE.MeshPhongMaterial({
         color: 0xFFFACD,
         shininess: 30
       });
       const roll = new THREE.Mesh(rollGeom, rollMat);
       group.add(roll);
-      
+
       // Ribbon
       const ribbonGeom = new THREE.TorusGeometry(0.25, 0.05, 16, 32);
       const ribbonMat = new THREE.MeshPhongMaterial({ color: 0xFF6B35 });
       const ribbon = new THREE.Mesh(ribbonGeom, ribbonMat);
       ribbon.rotation.x = Math.PI / 2;
       group.add(ribbon);
-      
+
       return group;
     };
 
     // Create Atom (Science/Knowledge symbol)
     const createAtom = () => {
       const group = new THREE.Group();
-      
+
       // Nucleus
       const nucleusGeom = new THREE.SphereGeometry(0.25, 32, 32);
-      const nucleusMat = new THREE.MeshPhongMaterial({ 
+      const nucleusMat = new THREE.MeshPhongMaterial({
         color: 0xFFD700,
         emissive: 0xFFD700,
         emissiveIntensity: 0.3
       });
       const nucleus = new THREE.Mesh(nucleusGeom, nucleusMat);
       group.add(nucleus);
-      
+
       // Electron orbits
       const orbitGeom = new THREE.TorusGeometry(1, 0.03, 16, 100);
-      const orbitMat = new THREE.MeshPhongMaterial({ 
+      const orbitMat = new THREE.MeshPhongMaterial({
         color: 0x4A90E2,
         transparent: true,
         opacity: 0.7
       });
-      
+
       for (let i = 0; i < 3; i++) {
         const orbit = new THREE.Mesh(orbitGeom, orbitMat);
         orbit.rotation.x = (Math.PI / 3) * i;
         orbit.rotation.y = (Math.PI / 4) * i;
         group.add(orbit);
-        
+
         // Electrons
         const electronGeom = new THREE.SphereGeometry(0.1, 16, 16);
-        const electronMat = new THREE.MeshPhongMaterial({ 
+        const electronMat = new THREE.MeshPhongMaterial({
           color: 0x00D4FF,
           emissive: 0x00D4FF,
           emissiveIntensity: 0.5
@@ -174,37 +174,37 @@ export default function Home(){
         electron.position.x = 1;
         orbit.add(electron);
       }
-      
+
       return group;
     };
 
     const floatingObjects = [];
     const objectTypes = [createPencil, createBookStack, createApple, createDiploma, createAtom];
-    
+
     // Add 12 floating objects with better distribution
     for (let i = 0; i < 12; i++) {
       const createFunc = objectTypes[i % objectTypes.length];
       const obj = createFunc();
-      
+
       // Better positioning - avoid center
       const angle = (i / 12) * Math.PI * 2;
       const radius = 8 + Math.random() * 4;
-      
+
       obj.position.set(
         Math.cos(angle) * radius,
         (Math.random() - 0.5) * 8,
         (Math.random() - 0.5) * 8 - 3
       );
-      
+
       obj.rotation.set(
         Math.random() * Math.PI,
         Math.random() * Math.PI,
         Math.random() * Math.PI
       );
-      
+
       const scale = 0.6 + Math.random() * 0.6;
       obj.scale.set(scale, scale, scale);
-      
+
       floatingObjects.push({
         mesh: obj,
         speedX: (Math.random() - 0.5) * 0.005,
@@ -221,7 +221,7 @@ export default function Home(){
     // Enhanced Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    
+
     const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
     mainLight.position.set(5, 5, 5);
     scene.add(mainLight);
@@ -239,47 +239,47 @@ export default function Home(){
     let mouseY = 0;
     let targetMouseX = 0;
     let targetMouseY = 0;
-    
+
     const handleMouseMove = (e) => {
       targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
       targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
     };
-    
+
     window.addEventListener('mousemove', handleMouseMove);
 
     const clock = new THREE.Clock();
-    
+
     const animate = () => {
       requestAnimationFrame(animate);
-      
+
       const elapsed = clock.getElapsedTime();
-      
+
       // Smooth mouse movement
       mouseX += (targetMouseX - mouseX) * 0.05;
       mouseY += (targetMouseY - mouseY) * 0.05;
-      
+
       floatingObjects.forEach((obj, index) => {
         // Rotation
         obj.mesh.rotation.x += obj.rotSpeedX;
         obj.mesh.rotation.y += obj.rotSpeedY;
         obj.mesh.rotation.z += obj.rotSpeedZ;
-        
+
         // Floating motion
         obj.mesh.position.x = obj.initialX + Math.sin(elapsed * 0.5 + index) * 0.5;
         obj.mesh.position.y = obj.initialY + Math.cos(elapsed * 0.7 + index) * 0.5;
-        
+
         // Subtle mouse interaction - much less aggressive
         obj.mesh.position.x += mouseX * 0.3;
         obj.mesh.position.y += mouseY * 0.3;
       });
-      
+
       // Rotate accent light
       accentLight.position.x = Math.sin(elapsed * 0.5) * 5;
       accentLight.position.z = Math.cos(elapsed * 0.5) * 5 + 3;
-      
+
       renderer.render(scene, camera);
     };
-    
+
     animate();
 
     const handleResize = () => {
@@ -287,13 +287,27 @@ export default function Home(){
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-    
+
     window.addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
+
+      // Cleanup Three.js resources
+      scene.traverse((object) => {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => material.dispose());
+          } else {
+            object.material.dispose();
+          }
+        }
+      });
       renderer.dispose();
     };
   }, []);
@@ -323,13 +337,13 @@ export default function Home(){
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const navigate = useNavigate();
-  function handleStart(){
+  function handleStart() {
     navigate('/auth');
   }
   return (
     <div className="landing-container">
       <canvas ref={canvasRef} className="webgl-canvas" />
-      
+
       {/* Navigation */}
       <nav className="navbar">
         <div className="nav-content">
@@ -354,15 +368,15 @@ export default function Home(){
               <span className="badge-icon">✨</span>
               <span>Your Learning Journey Starts Here</span>
             </div>
-            
+
             <h1 className="hero-title">
               Welcome to <span className="brand-highlight">TutorHive</span>
               <br />
               <span className="hero-subtitle-inline">Where Knowledge Meets Innovation</span>
             </h1>
-            
+
             <p className="hero-description">
-              Connect with expert tutors instantly. Get real-time feedback. 
+              Connect with expert tutors instantly. Get real-time feedback.
               <br />Transform your learning experience with our AI-powered platform.
             </p>
 
@@ -570,7 +584,7 @@ export default function Home(){
               Join thousands of students and tutors building a smarter future together.
               <br />Start your learning journey today - it's free to get started!
             </p>
-            
+
             <div className="cta-buttons">
               <button className="btn-primary" onClick={handleStart}>
                 Get Started Free

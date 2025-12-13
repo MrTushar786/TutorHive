@@ -18,7 +18,22 @@ const allowedOrigins = process.env.CLIENT_URL?.split(",").map((origin) => origin
 
 app.use(
   cors({
-    origin: allowedOrigins?.length ? allowedOrigins : "*",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // If CLIENT_URL is set, strict check against it
+      if (allowedOrigins?.length) {
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      } else {
+        // Development mode: Allow all origins (reflect request origin)
+        callback(null, true);
+      }
+    },
     credentials: true,
   })
 );

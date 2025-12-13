@@ -1,3 +1,4 @@
+import os from "os";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import app from "./app.js";
@@ -38,11 +39,22 @@ async function startServer() {
       // Note: Socket.IO handles its own upgrade requests (e.g., /bridge)
     });
 
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ API ready on port ${PORT}`);
       console.log(`✅ WebSocket server ready on ws://localhost:${PORT}/ws`);
       console.log(`✅ Message WebSocket server ready on ws://localhost:${PORT}/ws/messages`);
       console.log(`✅ Socket.IO video signaling server ready on /bridge`);
+
+      const nets = os.networkInterfaces();
+      console.log("\n🌐 Available Network Addresses:");
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+          if (net.family === 'IPv4' && !net.internal) {
+            console.log(`   http://${net.address}:${PORT}`);
+          }
+        }
+      }
+      console.log(`   http://localhost:${PORT}\n`);
     });
   } catch (error) {
     console.error("Failed to start server", error);

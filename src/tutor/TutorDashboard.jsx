@@ -185,7 +185,8 @@ export default function TutorDashboard() {
     if (!selectedStudent || !user || !token) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/bookings', {
+      const apiUrl = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiUrl}/api/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

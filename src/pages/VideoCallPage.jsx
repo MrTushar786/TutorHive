@@ -94,8 +94,8 @@ export default function VideoCallPage() {
           }
 
           const timeout = setTimeout(() => {
-            reject(new Error("Connection timeout. Please ensure the server is running."));
-          }, 15000);
+            reject(new Error("Connection timeout. Please ensure the server is running on port 5000."));
+          }, 20000);
 
           socket.once("connect", () => {
             clearTimeout(timeout);
@@ -266,6 +266,20 @@ export default function VideoCallPage() {
           // Handle user joined/left
           socket.on("user-joined", (data) => {
             console.log("User joined:", data);
+
+            // If we are the caller (Tutor) and a user joins, we initiates the call
+            // This handles the case where Tutor joins first (sends offer to void), then Student joins
+            if (isCaller && peerConnectionRef.current) {
+              console.log("Peer joined, initiating call offer...");
+              // Small delay to ensure peer is ready
+              setTimeout(() => {
+                if (mounted && peerConnectionRef.current) {
+                  peerConnectionRef.current.createOffer().catch(err => {
+                    console.error("Failed to create offer for new peer:", err);
+                  });
+                }
+              }, 1000);
+            }
           });
 
           socket.on("user-left", (data) => {
@@ -363,7 +377,7 @@ export default function VideoCallPage() {
     // 2. Mark session as completed in backend (if user initiated end)
     if (endedByUser) {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrl = import.meta.env.VITE_API_URL || "";
         await fetch(`${apiUrl}/api/bookings/${bookingId}`, {
           method: "PUT",
           headers: {
@@ -387,7 +401,7 @@ export default function VideoCallPage() {
 
   const handleFeedbackSubmit = async (data) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const apiUrl = import.meta.env.VITE_API_URL || "";
       const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/feedback`, {
         method: "POST",
         headers: {

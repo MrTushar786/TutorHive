@@ -1,4 +1,4 @@
-const rawBase = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+const rawBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : `${rawBase}/api`;
 
 async function parseResponse(response) {

@@ -101,14 +101,23 @@ async function verifyBookingAccess(userId, bookingId, role) {
 export function setupVideoSocket(server) {
   const allowedOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim())
-    : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"];
+    : []; // Default to empty to allow all in dev logic below
 
-  console.log("Video Socket allowed origins:", allowedOrigins);
+  console.log("Video Socket allowed origins:", allowedOrigins.length ? allowedOrigins : "ALL (Dev Mode)");
 
   const io = new Server(server, {
     path: "/bridge",
     cors: {
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.length === 0) return callback(null, true); // Dev mode
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
       methods: ["GET", "POST"],
     },

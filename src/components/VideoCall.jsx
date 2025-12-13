@@ -4,14 +4,14 @@ import FeedbackForm from "./FeedbackForm";
 import { getIceServers } from "../hooks/useIceServers";
 
 // VideoCall component
-export default function VideoCall({ 
-  roomId, 
-  isTutor = false, 
-  userName = "You", 
-  session = null, 
-  onClose = () => {}, 
-  onSubmitFeedback = null, 
-  ...props 
+export default function VideoCall({
+  roomId,
+  isTutor = false,
+  userName = "You",
+  session = null,
+  onClose = () => { },
+  onSubmitFeedback = null,
+  ...props
 }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -38,15 +38,21 @@ export default function VideoCall({
         }
 
         // Create WebSocket connection for signaling
-        const apiUrlRaw = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrlRaw = import.meta.env.VITE_API_URL || "";
         const apiUrl = apiUrlRaw.replace(/\/$/, "");
         let wsBase;
-        try {
-          const api = new URL(apiUrl);
-          const wsProtocol = api.protocol === "https:" ? "wss:" : "ws:";
-          wsBase = `${wsProtocol}//${api.host}`;
-        } catch (_err) {
-          wsBase = apiUrl.startsWith("https") ? "wss://localhost:5000" : "ws://localhost:5000";
+
+        if (!apiUrl || apiUrl.startsWith("/")) {
+          const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          wsBase = `${protocol}//${window.location.hostname}:5000`;
+        } else {
+          try {
+            const api = new URL(apiUrl);
+            const wsProtocol = api.protocol === "https:" ? "wss:" : "ws:";
+            wsBase = `${wsProtocol}//${api.host}`;
+          } catch (_err) {
+            wsBase = "ws://localhost:5000";
+          }
         }
 
         const ws = new WebSocket(`${wsBase}/ws?roomId=${encodeURIComponent(roomId)}`);
@@ -55,9 +61,9 @@ export default function VideoCall({
         const connectionTimeout = setTimeout(() => {
           if (ws.readyState !== WebSocket.OPEN) {
             setConnectionStatus("error");
-            console.error("WebSocket connection timeout");
+            console.error("WebSocket connection timeout. Please check your network connection.");
           }
-        }, 10000);
+        }, 20000);
 
         ws.onopen = () => {
           clearTimeout(connectionTimeout);

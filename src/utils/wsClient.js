@@ -13,15 +13,26 @@ export function createWSClient({
     throw new Error("wsClient: roomId or queryParams is required");
   }
 
-  const apiUrlRaw = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const apiUrlRaw = import.meta.env.VITE_API_URL || "";
   const apiUrl = apiUrlRaw.replace(/\/$/, "");
   let wsBase;
-  try {
-    const api = new URL(apiUrl);
-    const wsProtocol = api.protocol === "https:" ? "wss:" : "ws:";
-    wsBase = `${wsProtocol}//${api.host}`;
-  } catch (_err) {
-    wsBase = apiUrl.startsWith("https") ? "wss://localhost:5000" : "ws://localhost:5000";
+
+  // Handle relative or empty URL (use current window origin but target port 5000 for backend)
+  if (!apiUrl || apiUrl.startsWith("/")) {
+    if (typeof window !== "undefined") {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      wsBase = `${protocol}//${window.location.hostname}:5000`;
+    } else {
+      wsBase = "ws://localhost:5000";
+    }
+  } else {
+    try {
+      const api = new URL(apiUrl);
+      const wsProtocol = api.protocol === "https:" ? "wss:" : "ws:";
+      wsBase = `${wsProtocol}//${api.host}`;
+    } catch (_err) {
+      wsBase = "ws://localhost:5000";
+    }
   }
 
   // Build URL with either queryParams or roomId
