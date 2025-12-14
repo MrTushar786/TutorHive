@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import AuthPage from "./auth/AuthPage";
+import AuthCallback from "./auth/AuthCallback";
 import StudentDashboard from "./student/StudentDashboard";
 import TutorDashboard from "./tutor/TutorDashboard";
 import VideoCallPage from "./pages/VideoCallPage";
@@ -12,6 +13,7 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
           path="/studentdashboard"
           element={(

@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import passport from "./config/passport.js";
 import authRoutes from "./routes/auth.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import tutorRoutes from "./routes/tutor.routes.js";
@@ -41,6 +42,7 @@ app.use(
 app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(passport.initialize());
 
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan("dev"));

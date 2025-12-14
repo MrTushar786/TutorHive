@@ -175,3 +175,15 @@ export async function updateProfile(req, res) {
   res.json({ user: responseData });
 }
 
+
+export async function socialCallback(req, res) {
+  const token = createAuthToken(req.user);
+
+  // Determine frontend URL 
+  // In production, CLIENT_URL should be set. In dev, it might be localhost:5173
+  const clientUrls = process.env.CLIENT_URL?.split(",") || [];
+  const clientUrl = clientUrls.length > 0 ? clientUrls[0].trim() : "http://localhost:5173";
+
+  // Redirect to frontend with token
+  res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+}

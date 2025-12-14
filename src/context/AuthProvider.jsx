@@ -111,6 +111,10 @@ export function AuthProvider({ children }) {
       login,
       register,
       logout,
+      setSession: (token) => {
+        setToken(token);
+        persistSession(token);
+      },
     }),
     [user, token, loading, error, login, register, logout]
   );
