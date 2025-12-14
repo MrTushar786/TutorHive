@@ -24,7 +24,7 @@ app.use(
 
       // If CLIENT_URL is set, strict check against it
       if (allowedOrigins?.length) {
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        if (allowedOrigins.indexOf(origin) !== -1 || origin === "https://tutorhivee.vercel.app") {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));

@@ -112,7 +112,7 @@ export function setupVideoSocket(server) {
         if (!origin) return callback(null, true);
         if (allowedOrigins.length === 0) return callback(null, true); // Dev mode
 
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        if (allowedOrigins.indexOf(origin) !== -1 || origin === "https://tutorhivee.vercel.app") {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
