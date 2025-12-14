@@ -57,7 +57,7 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
             {
                 clientID: GOOGLE_CLIENT_ID,
                 clientSecret: GOOGLE_CLIENT_SECRET,
-                callbackURL: "/api/auth/google/callback",
+                callbackURL: process.env.GOOGLE_CALLBACK_URL,
             },
             (accessToken, refreshToken, profile, done) => handleSocialLogin("google", profile, done)
         )

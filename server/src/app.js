@@ -14,6 +14,9 @@ import { requestId } from "./middleware/requestId.js";
 
 const app = express();
 
+// Trust proxy for secure cookies and protocol detection on Render
+app.enable("trust proxy");
+
 app.use(requestId);
 const allowedOrigins = process.env.CLIENT_URL?.split(",").map((origin) => origin.trim());
 
