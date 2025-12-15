@@ -1,4 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  LayoutDashboard,
+  Search,
+  Calendar,
+  TrendingUp,
+  MessageSquare,
+  Settings,
+  UserPen,
+  LogOut,
+  User
+} from "lucide-react";
 import "./StudentDashboard.css";
 import useAuth from "../hooks/useAuth";
 import { fetchStudentDashboard } from "../api/student";
@@ -349,12 +360,12 @@ export default function StudentDashboard() {
               onClick={() => setActiveTab(tab)}
             >
               <span className="nav-icon">
-                {tab === "dashboard" && "📊"}
-                {tab === "find-tutors" && "🔍"}
-                {tab === "sessions" && "📅"}
-                {tab === "progress" && "📈"}
-                {tab === "messages" && "💬"}
-                {tab === "settings" && "⚙️"}
+                {tab === "dashboard" && <LayoutDashboard size={20} />}
+                {tab === "find-tutors" && <Search size={20} />}
+                {tab === "sessions" && <Calendar size={20} />}
+                {tab === "progress" && <TrendingUp size={20} />}
+                {tab === "messages" && <MessageSquare size={20} />}
+                {tab === "settings" && <Settings size={20} />}
               </span>
               <span>{tab.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>
             </button>
@@ -367,7 +378,7 @@ export default function StudentDashboard() {
               {studentProfile?.avatar?.startsWith("data:") || studentProfile?.avatar?.startsWith("http") ? (
                 <img src={studentProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : (
-                studentProfile?.avatar || "👨‍🎓"
+                studentProfile?.avatar || <User size={24} color="#666" />
               )}
             </div>
             <div className="user-info">
@@ -384,11 +395,11 @@ export default function StudentDashboard() {
             type="button"
             title="Edit Profile"
           >
-            <span>✏️</span>
+            <UserPen size={18} />
             <span>Edit Profile</span>
           </button>
           <button className="logout-btn" onClick={logout} type="button">
-            <span>🚪</span>
+            <LogOut size={18} />
             <span>Logout</span>
           </button>
         </div>
@@ -989,6 +1000,28 @@ export default function StudentDashboard() {
           onCancel={handleRescheduleCancel}
         />
       )}
+
+      {/* Mobile Navigation */}
+      <nav className="student-mobile-nav">
+        {["dashboard", "find-tutors", "sessions", "messages", "settings"].map((tab) => (
+          <button
+            key={tab}
+            className={`mobile-nav-item ${activeTab === tab ? "active" : ""}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            <span className="mobile-nav-icon">
+              {tab === "dashboard" && <LayoutDashboard size={20} />}
+              {tab === "find-tutors" && <Search size={20} />}
+              {tab === "sessions" && <Calendar size={20} />}
+              {tab === "messages" && <MessageSquare size={20} />}
+              {tab === "settings" && <Settings size={20} />}
+            </span>
+            <span className="mobile-nav-label">
+              {tab === "find-tutors" ? "Tutors" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

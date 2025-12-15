@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import '../css/App.css';
 import { useNavigate } from 'react-router-dom';
+import MobileBottomNav from '../component/MobileBottomNav';
 
 export default function Home() {
   const canvasRef = useRef(null);
@@ -22,7 +23,10 @@ export default function Home() {
 
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    camera.position.z = 12;
+
+    const isMobile = window.innerWidth <= 768;
+    camera.position.z = isMobile ? 18 : 12; // Move camera back on mobile
+
 
     // Create Pencil
     const createPencil = () => {
@@ -181,8 +185,10 @@ export default function Home() {
     const floatingObjects = [];
     const objectTypes = [createPencil, createBookStack, createApple, createDiploma, createAtom];
 
-    // Add 12 floating objects with better distribution
-    for (let i = 0; i < 12; i++) {
+    // Reduce objects on mobile for clarity and performance
+    const objectCount = isMobile ? 6 : 12;
+
+    for (let i = 0; i < objectCount; i++) {
       const createFunc = objectTypes[i % objectTypes.length];
       const obj = createFunc();
 
@@ -283,8 +289,10 @@ export default function Home() {
     animate();
 
     const handleResize = () => {
+      const isMobileNow = window.innerWidth <= 768;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
+      camera.position.z = isMobileNow ? 18 : 12;
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
 
@@ -625,6 +633,11 @@ export default function Home() {
           />
         ))}
       </div>
+      <MobileBottomNav
+        activeSection={activeSection}
+        scrollToSection={scrollToSection}
+        handleStart={handleStart}
+      />
     </div>
   );
 };

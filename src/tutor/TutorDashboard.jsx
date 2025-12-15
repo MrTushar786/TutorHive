@@ -1,4 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  DollarSign,
+  MessageSquare,
+  Settings,
+  UserPen,
+  LogOut,
+  User
+} from "lucide-react";
 import "./TutorDashboard.css";
 import useAuth from "../hooks/useAuth";
 import { fetchTutorDashboard } from "../api/tutor";
@@ -304,14 +315,14 @@ export default function TutorDashboard() {
               onClick={() => setActiveTab(tab)}
             >
               <span className="nav-icon">
-                {tab === "dashboard" && "🏠"}
-                {tab === "students" && "👨‍🎓"}
-                {tab === "schedule" && "📅"}
-                {tab === "earnings" && "💰"}
-                {tab === "messages" && "💬"}
-                {tab === "settings" && "⚙️"}
+                {tab === "dashboard" && <LayoutDashboard size={20} />}
+                {tab === "students" && <Users size={20} />}
+                {tab === "schedule" && <Calendar size={20} />}
+                {tab === "earnings" && <DollarSign size={20} />}
+                {tab === "messages" && <MessageSquare size={20} />}
+                {tab === "settings" && <Settings size={20} />}
               </span>
-              <span>{tab.replace("-", " ")}</span>
+              <span>{tab.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>
             </button>
           ))}
         </nav>
@@ -322,7 +333,7 @@ export default function TutorDashboard() {
               {tutorProfile?.avatar?.startsWith("data:") || tutorProfile?.avatar?.startsWith("http") ? (
                 <img src={tutorProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : (
-                tutorProfile?.avatar || "👩‍🏫"
+                tutorProfile?.avatar || <User size={24} color="#666" />
               )}
             </div>
             <div className="user-info">
@@ -339,11 +350,11 @@ export default function TutorDashboard() {
             type="button"
             title="Edit Profile"
           >
-            <span>✏️</span>
+            <UserPen size={18} />
             <span>Edit Profile</span>
           </button>
           <button className="logout-btn" onClick={logout} type="button">
-            <span>🚪</span>
+            <LogOut size={18} />
             <span>Logout</span>
           </button>
         </div>
@@ -881,6 +892,28 @@ export default function TutorDashboard() {
         </div>
       )}
 
+      {/* Mobile Navigation */}
+      <nav className="tutor-mobile-nav">
+        {["dashboard", "students", "schedule", "earnings", "messages", "settings"].map((tab) => (
+          <button
+            key={tab}
+            className={`mobile-nav-item ${activeTab === tab ? "active" : ""}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            <span className="mobile-nav-icon">
+              {tab === "dashboard" && <LayoutDashboard size={20} />}
+              {tab === "students" && <Users size={20} />}
+              {tab === "schedule" && <Calendar size={20} />}
+              {tab === "earnings" && <DollarSign size={20} />}
+              {tab === "messages" && <MessageSquare size={20} />}
+              {tab === "settings" && <Settings size={20} />}
+            </span>
+            <span className="mobile-nav-label">
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
