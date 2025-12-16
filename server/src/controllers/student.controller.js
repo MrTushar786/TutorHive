@@ -48,19 +48,23 @@ export async function getDashboard(req, res) {
     }));
 
   const progressBySubject = bookings.reduce((acc, booking) => {
-    acc[booking.subject] = acc[booking.subject] || { lessons: 0, completed: 0 };
-    acc[booking.subject].lessons += 1;
+    // Normalize subject
+    const subject = booking.subject || "General";
+    acc[subject] = acc[subject] || { lessons: 0, completed: 0 };
+    acc[subject].lessons += 1;
     if (booking.status === "completed") {
-      acc[booking.subject].completed += 1;
+      acc[subject].completed += 1;
     }
     return acc;
   }, {});
 
-  const progressData = Object.entries(progressBySubject).map(([subject, data]) => ({
-    subject,
-    progress: Math.round((data.completed / data.lessons) * 100) || 0,
-    lessons: data.lessons,
-  }));
+  const progressData = Object.entries(progressBySubject)
+    .map(([subject, data]) => ({
+      subject,
+      progress: Math.round((data.completed / data.lessons) * 100) || 0,
+      lessons: data.lessons,
+    }))
+    .sort((a, b) => b.lessons - a.lessons); // Sort by most active subjects
 
   // Fetch tutors logic updated to use TutorProfile
   const tutorProfiles = await import("../models/TutorProfile.js").then(m => m.default.find().limit(12).sort({ rating: -1 }).populate("userId"));

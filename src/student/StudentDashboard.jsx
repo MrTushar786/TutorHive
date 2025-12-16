@@ -8,7 +8,17 @@ import {
   Settings,
   UserPen,
   LogOut,
-  User
+  User,
+  BookOpen,
+  Clock,
+  Target,
+  CheckCircle,
+  Hourglass,
+  XCircle,
+  Trophy,
+  Star,
+  Flame,
+  Zap
 } from "lucide-react";
 import "./StudentDashboard.css";
 import useAuth from "../hooks/useAuth";
@@ -60,6 +70,7 @@ export default function StudentDashboard() {
   });
   const [bookingStatus, setBookingStatus] = useState("idle");
   const [bookingError, setBookingError] = useState("");
+  const [paymentStep, setPaymentStep] = useState(1); // 1: Form, 2: Gateway, 3: Processing, 4: Success
   const [sessionsFilter, setSessionsFilter] = useState("upcoming");
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -234,6 +245,7 @@ export default function StudentDashboard() {
       notes: "",
     });
     setBookingError("");
+    setPaymentStep(1);
   };
 
   const handleBookingChange = (e) => {
@@ -243,15 +255,26 @@ export default function StudentDashboard() {
     });
   };
 
-  const handleBooking = async () => {
+  /* Payment & Booking Flow */
+  const initiatePayment = () => {
     if (!selectedTutor) return;
     if (!bookingForm.date || !bookingForm.time) {
       setBookingError("Please select a date and time");
       return;
     }
+    // Proceed to Payment Gateway
+    setPaymentStep(2);
+  };
+
+  const processPayment = async () => {
+    setPaymentStep(3); // Processing
     setBookingStatus("loading");
     setBookingError("");
+
     try {
+      // Simulate Payment Gateway Delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       const startTime = new Date(`${bookingForm.date}T${bookingForm.time}`);
       await createBooking(
         {
@@ -263,10 +286,15 @@ export default function StudentDashboard() {
         },
         token
       );
+
+      setPaymentStep(4); // Success!
       await loadDashboard();
-      closeBookingModal();
+
+      // Auto close after success? Or let user close manually.
+      // setTimeout(closeBookingModal, 2000); 
     } catch (err) {
       setBookingError(err.message);
+      setPaymentStep(2); // Go back to gateway on error
     } finally {
       setBookingStatus("idle");
     }
@@ -421,28 +449,36 @@ export default function StudentDashboard() {
 
             <div className="stats-grid">
               <div className="stat-card orange">
-                <div className="stat-icon">📚</div>
+                <div className="stat-icon">
+                  <BookOpen size={28} color="white" />
+                </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.completedLessons}</div>
                   <div className="stat-label">Completed Lessons</div>
                 </div>
               </div>
               <div className="stat-card blue">
-                <div className="stat-icon">📅</div>
+                <div className="stat-icon">
+                  <Calendar size={28} color="white" />
+                </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.upcomingLessons}</div>
                   <div className="stat-label">Upcoming Sessions</div>
                 </div>
               </div>
               <div className="stat-card purple">
-                <div className="stat-icon">⏱️</div>
+                <div className="stat-icon">
+                  <Clock size={28} color="white" />
+                </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.totalHours}</div>
                   <div className="stat-label">Total Hours</div>
                 </div>
               </div>
               <div className="stat-card green">
-                <div className="stat-icon">🎯</div>
+                <div className="stat-icon">
+                  <Target size={28} color="white" />
+                </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.progressPercentage}%</div>
                   <div className="stat-label">Overall Progress</div>
@@ -493,7 +529,13 @@ export default function StudentDashboard() {
                 <div className="activity-list">
                   {recentActivity.map((activity) => (
                     <div key={activity.id} className="activity-item">
-                      <div className="activity-icon">{activity.icon}</div>
+                      <div className={`activity-icon ${activity.type || 'default'}`}>
+                        {activity.type === "completed" && <CheckCircle size={20} color="white" />}
+                        {(activity.type === "confirmed" || activity.type === "upcoming") && <Calendar size={20} color="white" />}
+                        {activity.type === "pending" && <Hourglass size={20} color="white" />}
+                        {activity.type === "cancelled" && <XCircle size={20} color="white" />}
+                        {!["completed", "confirmed", "upcoming", "pending", "cancelled"].includes(activity.type) && <Calendar size={20} color="white" />}
+                      </div>
                       <div className="activity-details">
                         <div className="activity-message">{activity.message}</div>
                         <div className="activity-time">{formatDate(activity.time)}</div>
@@ -765,21 +807,29 @@ export default function StudentDashboard() {
               <div className="achievements-card">
                 <h3>Recent Achievements</h3>
                 <div className="achievements-grid">
-                  <div className="achievement-badge">
-                    <div className="badge-icon">🏆</div>
-                    <div className="badge-name">25 Lessons</div>
+                  <div className={`achievement-badge ${stats.completedLessons >= 1 ? '' : 'locked'}`}>
+                    <div className="badge-icon">
+                      <Trophy size={32} color="#D4AF37" fill="#FFD700" strokeWidth={1.5} />
+                    </div>
+                    <div className="badge-name">First Lesson</div>
                   </div>
-                  <div className="achievement-badge">
-                    <div className="badge-icon">⭐</div>
-                    <div className="badge-name">Top Student</div>
+                  <div className={`achievement-badge ${stats.progressPercentage >= 10 ? '' : 'locked'}`}>
+                    <div className="badge-icon">
+                      <Star size={32} color="#FFA000" fill="#FFC107" strokeWidth={1.5} />
+                    </div>
+                    <div className="badge-name">Rising Star</div>
                   </div>
-                  <div className="achievement-badge">
-                    <div className="badge-icon">🔥</div>
-                    <div className="badge-name">7 Day Streak</div>
+                  <div className={`achievement-badge ${stats.completedLessons >= 2 ? '' : 'locked'}`}>
+                    <div className="badge-icon">
+                      <Flame size={32} color="#E64A19" fill="#FF5722" strokeWidth={1.5} />
+                    </div>
+                    <div className="badge-name">3 Lesson Streak</div>
                   </div>
-                  <div className="achievement-badge locked">
-                    <div className="badge-icon">🎯</div>
-                    <div className="badge-name">50 Lessons</div>
+                  <div className={`achievement-badge ${stats.completedLessons >= 3 ? '' : 'locked'}`}>
+                    <div className="badge-icon">
+                      <Target size={32} color="#C2185B" strokeWidth={2} />
+                    </div>
+                    <div className="badge-name">Scholar</div>
                   </div>
                 </div>
               </div>
@@ -787,20 +837,33 @@ export default function StudentDashboard() {
 
             <div className="subject-progress-list">
               <h3>Progress by Subject</h3>
-              {progressData.map((item) => (
-                <div key={item.subject} className="subject-progress-item">
-                  <div className="subject-progress-header">
-                    <div className="subject-name">{item.subject}</div>
-                    <div className="subject-stats">
-                      <span>{item.lessons} lessons</span>
-                      <span className="progress-percent">{item.progress}%</span>
+              {progressData.map((item, index) => {
+                const colors = [
+                  "linear-gradient(90deg, #9C27B0, #E040FB)", // Purple
+                  "linear-gradient(90deg, #FF4081, #C2185B)", // Pink
+                  "linear-gradient(90deg, #FF6B35, #F44336)"  // Orange
+                ];
+                return (
+                  <div key={item.subject} className="subject-progress-item">
+                    <div className="subject-progress-header">
+                      <div className="subject-name">{item.subject}</div>
+                      <div className="subject-stats">
+                        <span>{item.lessons} lessons</span>
+                        <span className="progress-percent" style={{ color: index === 0 ? '#9C27B0' : index === 1 ? '#C2185B' : '#FF6B35' }}>{item.progress}%</span>
+                      </div>
+                    </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${item.progress}%`,
+                          background: colors[index % colors.length]
+                        }}
+                      />
                     </div>
                   </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${item.progress}%` }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -923,72 +986,159 @@ export default function StudentDashboard() {
               </div>
             </div>
             <div className="modal-body">
-              <div className="booking-form">
-                <div className="form-group">
-                  <label htmlFor="booking-date">Select Date</label>
-                  <input
-                    id="booking-date"
-                    type="date"
-                    name="date"
-                    className="form-input"
-                    value={bookingForm.date}
-                    onChange={handleBookingChange}
-                  />
+              {/* Step 1: Booking Form */}
+              {paymentStep === 1 && (
+                <div className="booking-form">
+                  <div className="form-group">
+                    <label htmlFor="booking-date">Select Date</label>
+                    <input
+                      id="booking-date"
+                      type="date"
+                      name="date"
+                      className="form-input"
+                      value={bookingForm.date}
+                      onChange={handleBookingChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="booking-time">Select Time</label>
+                    <input
+                      id="booking-time"
+                      type="time"
+                      name="time"
+                      className="form-input"
+                      value={bookingForm.time}
+                      onChange={handleBookingChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="booking-duration">Session Duration</label>
+                    <select
+                      id="booking-duration"
+                      name="duration"
+                      className="form-input"
+                      value={bookingForm.duration}
+                      onChange={handleBookingChange}
+                    >
+                      {DURATION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} - ${Math.round(((selectedTutor.hourlyRate || 0) / 60) * option.value)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="booking-notes">Additional Notes (Optional)</label>
+                    <textarea
+                      id="booking-notes"
+                      name="notes"
+                      className="form-input"
+                      rows="3"
+                      placeholder="Any specific topics you'd like to cover?"
+                      value={bookingForm.notes}
+                      onChange={handleBookingChange}
+                    />
+                  </div>
+                  {bookingError && <p className="form-error">{bookingError}</p>}
                 </div>
-                <div className="form-group">
-                  <label htmlFor="booking-time">Select Time</label>
-                  <input
-                    id="booking-time"
-                    type="time"
-                    name="time"
-                    className="form-input"
-                    value={bookingForm.time}
-                    onChange={handleBookingChange}
-                  />
+              )}
+
+              {/* Step 2: Payment Gateway */}
+              {paymentStep === 2 && (
+                <div className="payment-gateway">
+                  <div className="payment-summary">
+                    <div className="summary-row">
+                      <span>Tutor Rate</span>
+                      <span>${selectedTutor.hourlyRate}/hr</span>
+                    </div>
+                    <div className="summary-row">
+                      <span>Duration</span>
+                      <span>{bookingForm.duration} mins</span>
+                    </div>
+                    <div className="summary-total">
+                      <span>Total to Pay</span>
+                      <span>${Math.round(((selectedTutor.hourlyRate || 0) / 60) * bookingForm.duration)}</span>
+                    </div>
+                  </div>
+
+                  <div className="card-input-mock">
+                    <label>Credit Card Number</label>
+                    <div className="card-field">
+                      <span className="card-icon">💳</span>
+                      <input type="text" placeholder="**** **** **** 4242" defaultValue="4242 4242 4242 4242" readOnly />
+                      <span className="card-brand">VISA</span>
+                    </div>
+                    <div className="card-row">
+                      <div className="card-col">
+                        <label>Expiry</label>
+                        <input type="text" defaultValue="12/28" readOnly />
+                      </div>
+                      <div className="card-col">
+                        <label>CVC</label>
+                        <input type="text" defaultValue="123" readOnly />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="secure-badge">🔒 256-bit SSL Secure Payment</div>
+                  {bookingError && <p className="form-error">{bookingError}</p>}
                 </div>
-                <div className="form-group">
-                  <label htmlFor="booking-duration">Session Duration</label>
-                  <select
-                    id="booking-duration"
-                    name="duration"
-                    className="form-input"
-                    value={bookingForm.duration}
-                    onChange={handleBookingChange}
-                  >
-                    {DURATION_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label} - ${Math.round(((selectedTutor.hourlyRate || 0) / 60) * option.value)}
-                      </option>
-                    ))}
-                  </select>
+              )}
+
+              {/* Step 3: Processing */}
+              {paymentStep === 3 && (
+                <div className="payment-processing">
+                  <div className="spinner large"></div>
+                  <p>Processing Payment...</p>
+                  <span className="sub-text">Please do not close this window</span>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="booking-notes">Additional Notes (Optional)</label>
-                  <textarea
-                    id="booking-notes"
-                    name="notes"
-                    className="form-input"
-                    rows="3"
-                    placeholder="Any specific topics you'd like to cover?"
-                    value={bookingForm.notes}
-                    onChange={handleBookingChange}
-                  />
+              )}
+
+              {/* Step 4: Success */}
+              {paymentStep === 4 && (
+                <div className="payment-success">
+                  <div className="success-icon">🎉</div>
+                  <h3>Booking Confirmed!</h3>
+                  <p>Your session has been successfully booked and paid for.</p>
                 </div>
-                {bookingError && <p className="form-error">{bookingError}</p>}
-              </div>
+              )}
             </div>
+
             <div className="modal-footer">
-              <button className="modal-btn secondary" onClick={closeBookingModal} type="button">
-                Cancel
-              </button>
-              <button
-                className="modal-btn primary"
-                onClick={handleBooking}
-                disabled={bookingStatus === "loading"}
-                type="button"
-              >
-                {bookingStatus === "loading" ? "Booking..." : "Confirm Booking"}
-              </button>
+              {paymentStep === 1 && (
+                <>
+                  <button className="modal-btn secondary" onClick={closeBookingModal} type="button">
+                    Cancel
+                  </button>
+                  <button
+                    className="modal-btn primary"
+                    onClick={initiatePayment}
+                    type="button"
+                  >
+                    Proceed to Pay ${Math.round(((selectedTutor.hourlyRate || 0) / 60) * bookingForm.duration)}
+                  </button>
+                </>
+              )}
+
+              {paymentStep === 2 && (
+                <>
+                  <button className="modal-btn secondary" onClick={() => setPaymentStep(1)} type="button">
+                    Back
+                  </button>
+                  <button
+                    className="modal-btn primary pay-btn"
+                    onClick={processPayment}
+                    type="button"
+                  >
+                    Pay Now
+                  </button>
+                </>
+              )}
+
+              {paymentStep === 4 && (
+                <button className="modal-btn primary full-width" onClick={closeBookingModal} type="button">
+                  View My Sessions
+                </button>
+              )}
             </div>
           </div>
         </div>

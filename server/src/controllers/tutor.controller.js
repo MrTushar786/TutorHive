@@ -82,14 +82,23 @@ export async function getDashboard(req, res) {
     }
   }
 
+  // FORCE Update stats object for response
+  const realTimeStats = {
+    totalStudents,
+    completedLessons: completedSessions,
+    totalEarnings,
+    averageRating: Math.round(averageRating * 10) / 10
+  };
+
   // Check if we need to sync stats back to Profile
   // (We do this to keep Profile denormalized stats fresh)
-  if (tutorProfile.stats) {
+  if (tutorProfile) {
+    if (!tutorProfile.stats) tutorProfile.stats = {};
     tutorProfile.stats.totalStudents = totalStudents;
     tutorProfile.stats.completedLessons = completedSessions;
     tutorProfile.stats.totalEarnings = totalEarnings;
-    // We don't save here to avoid heavy writes on reading dashboard, 
-    // but you could add a 'lastUpdated' check.
+    // Save occasionally or always to keep DB in sync? Let's save to be safe.
+    await tutorProfile.save();
   }
 
   const earningsByMonth = completedBookings.reduce((acc, booking) => {
@@ -112,6 +121,7 @@ export async function getDashboard(req, res) {
   const mergedTutor = {
     ...tutor.toJSON(),
     ...tutorProfile.toJSON(),
+    stats: realTimeStats, // Override with real-time calcs
     _id: tutor._id // prioritize user ID
   };
 

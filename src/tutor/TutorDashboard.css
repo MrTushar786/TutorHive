@@ -1391,3 +1391,127 @@ body {
     text-align: center;
   }
 }
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.header-actions .btn-primary {
+  padding: 0.6rem 1.2rem;
+  background: var(--accent-green);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-actions .btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+
+.header-actions .btn-primary:not(:disabled):hover {
+  background: #43a047;
+  transform: translateY(-2px);
+}
+
+
+/* Withdrawal Modal */
+.withdrawal-modal {
+  width: 90%;
+  max-width: 450px;
+}
+
+.withdrawal-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.balance-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #c6f6d5;
+  border-radius: 10px;
+}
+
+.balance-info span {
+  font-weight: 600;
+  color: #2f855a;
+}
+
+.balance-info .amount {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.amount-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.currency-prefix {
+  position: absolute;
+  left: 1rem;
+  font-size: 1.2rem;
+  color: var(--text-light);
+}
+
+.amount-input-wrapper .form-input {
+  padding-left: 2rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.gateway-note {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 0.5rem;
+}
+
+.withdrawal-processing,
+.withdrawal-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 0;
+  gap: 1rem;
+}
+
+.sub-text {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.success-icon {
+  font-size: 3rem;
+  background: #e6fffa;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #38b2ac;
+}
+
+.spinner.large {
+  width: 50px;
+  height: 50px;
+  border-width: 4px;
+}
+
+.full-width {
+  width: 100%;
+}

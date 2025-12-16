@@ -44,6 +44,8 @@ export default function TutorDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [sessionModal, setSessionModal] = useState(false);
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [withdrawStep, setWithdrawStep] = useState(1); // 1: Input, 2: Processing, 3: Success
   const [sessionForm, setSessionForm] = useState({ notes: "", goals: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
@@ -693,7 +695,16 @@ export default function TutorDashboard() {
           <div className="earnings-content">
             <div className="page-header">
               <h1>Earnings</h1>
-              <p>Track your income and payouts</p>
+              <div className="header-actions">
+                <p>Track your income and payouts</p>
+                <button
+                  className="btn-primary"
+                  onClick={() => setWithdrawModal(true)}
+                  disabled={stats.totalEarnings === 0}
+                >
+                  Withdraw Funds
+                </button>
+              </div>
             </div>
 
             <div className="earnings-overview">
@@ -889,6 +900,93 @@ export default function TutorDashboard() {
               <button className="modal-btn primary" onClick={handleSessionStart} type="button">
                 Start Session
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Withdrawal Gateway Demo Modal */}
+      {withdrawModal && (
+        <div className="modal-overlay" onClick={() => { if (withdrawStep !== 2) setWithdrawModal(false); }}>
+          <div className="modal-content withdrawal-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>💳 Withdraw Funds</h2>
+              <button className="modal-close" onClick={() => setWithdrawModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              {withdrawStep === 1 && (
+                <div className="withdrawal-step">
+                  <div className="balance-info">
+                    <span>Available Balance</span>
+                    <span className="amount">{formatCurrency(stats.totalEarnings)}</span>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Payment Method</label>
+                    <select className="form-input">
+                      <option>🏦 Bank Transfer (**** 1234)</option>
+                      <option>🅿️ PayPal (user@example.com)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Amount to Withdraw</label>
+                    <div className="amount-input-wrapper">
+                      <span className="currency-prefix">$</span>
+                      <input type="number" className="form-input" defaultValue={stats.totalEarnings} max={stats.totalEarnings} />
+                    </div>
+                  </div>
+
+                  <div className="gateway-note">
+                    <p>🔒 Secure Gateway Connected</p>
+                  </div>
+                </div>
+              )}
+
+              {withdrawStep === 2 && (
+                <div className="withdrawal-processing">
+                  <div className="spinner large"></div>
+                  <p>Processing with Bank...</p>
+                  <span className="sub-text">Verifying credentials & checking liquidity</span>
+                </div>
+              )}
+
+              {withdrawStep === 3 && (
+                <div className="withdrawal-success">
+                  <div className="success-icon">✅</div>
+                  <h3>Withdrawal Initiated!</h3>
+                  <p>Your funds are on the way. You should receive them within 1-2 business days.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              {withdrawStep === 1 && (
+                <>
+                  <button className="modal-btn secondary" onClick={() => setWithdrawModal(false)}>Cancel</button>
+                  <button
+                    className="modal-btn primary"
+                    onClick={() => {
+                      setWithdrawStep(2);
+                      setTimeout(() => setWithdrawStep(3), 2000); // Simulate network delay
+                    }}
+                  >
+                    Confirm Withdrawal
+                  </button>
+                </>
+              )}
+              {withdrawStep === 3 && (
+                <button
+                  className="modal-btn primary full-width"
+                  onClick={() => {
+                    setWithdrawModal(false);
+                    setWithdrawStep(1);
+                  }}
+                >
+                  Done
+                </button>
+              )}
             </div>
           </div>
         </div>
