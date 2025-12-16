@@ -228,6 +228,13 @@ body {
   overflow-y: auto;
 }
 
+.main-content.no-padding {
+  padding: 0;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .page-header {
   margin-bottom: 2rem;
 }

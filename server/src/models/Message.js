@@ -26,7 +26,15 @@ const messageSchema = new mongoose.Schema({
   deletedBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
-  }]
+  }],
+  isEdited: {
+    type: Boolean,
+    default: false
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  }
 });
 
 export default mongoose.model("Message", messageSchema);

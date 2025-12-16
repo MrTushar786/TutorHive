@@ -54,7 +54,7 @@ async function startServer() {
           }
         }
       }
-      console.log(`   http://localhost:${PORT}\n`);
+      console.log(`http://localhost:${PORT}\n`);
     });
   } catch (error) {
     console.error("Failed to start server", error);

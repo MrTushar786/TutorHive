@@ -25,7 +25,10 @@ export function createMessageWebSocketServer() {
 
     // Send existing messages
     try {
-      const dbMessages = await Message.find({ conversationId })
+      const dbMessages = await Message.find({
+        conversationId,
+        deletedBy: { $ne: userId }
+      })
         .sort({ createdAt: 1 })
         .populate("sender", "name");
 
@@ -35,6 +38,8 @@ export function createMessageWebSocketServer() {
         sender: msg.sender._id.toString(),
         senderName: msg.sender.name,
         timestamp: msg.createdAt.toISOString(),
+        isEdited: msg.isEdited,
+        isDeleted: msg.isDeleted
       }));
 
       ws.send(JSON.stringify({

@@ -18,3 +18,18 @@ export async function deleteChat(conversationId, token) {
         token
     });
 }
+
+export async function editMessage(messageId, text, token) {
+    return apiRequest(`/messages/${messageId}`, {
+        method: "PATCH",
+        data: { text },
+        token
+    });
+}
+
+export async function deleteMessage(messageId, mode, token) {
+    return apiRequest(`/messages/${messageId}?mode=${mode}`, {
+        method: "DELETE",
+        token
+    });
+}

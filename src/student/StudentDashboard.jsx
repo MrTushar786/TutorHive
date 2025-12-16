@@ -92,13 +92,16 @@ export default function StudentDashboard() {
     }
   }, [realConversations, deletedConvIds]);
 
-  const loadDashboard = useCallback(async () => {
+  const dashboardLoadedRef = React.useRef(false);
+
+  const loadDashboard = useCallback(async (isBackground = false) => {
     if (!user?._id) return;
-    setLoading(true);
+    if (!isBackground && !dashboardLoadedRef.current) setLoading(true);
     setError("");
     try {
       const response = await fetchStudentDashboard(user._id, token);
       setDashboardData(response);
+      dashboardLoadedRef.current = true;
     } catch (err) {
       setError(err.message);
     } finally {
@@ -108,10 +111,13 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
     // Set up polling for real-time updates every 30 seconds
     const interval = setInterval(() => {
       if (activeTab === "dashboard") {
-        loadDashboard();
+        loadDashboard(true);
       }
     }, 30000);
     return () => clearInterval(interval);
@@ -405,7 +411,7 @@ export default function StudentDashboard() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className={`main-content ${activeTab === "messages" ? "no-padding" : ""}`}>
         {activeTab === "dashboard" && (
           <div className="dashboard-content">
             <div className="page-header">
@@ -801,10 +807,6 @@ export default function StudentDashboard() {
 
         {activeTab === "messages" && (
           <div className="messages-content">
-            <div className="page-header">
-              <h1>Messages</h1>
-              <p>Chat with your tutors</p>
-            </div>
             <ErrorBoundary>
               <Messaging
                 currentUser={user}

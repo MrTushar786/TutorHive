@@ -86,3 +86,62 @@ export const deleteConversation = async (req, res) => {
         res.status(500).json({ message: "Failed to delete conversation" });
     }
 };
+
+export const editMessage = async (req, res) => {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const userId = req.user.id;
+
+    try {
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: "Message not found" });
+        }
+
+        if (message.sender.toString() !== userId) {
+            return res.status(403).json({ message: "Not authorized to edit this message" });
+        }
+
+        message.text = text;
+        message.isEdited = true;
+        await message.save();
+
+        res.json({ success: true, message });
+    } catch (error) {
+        console.error("Error editing message:", error);
+        res.status(500).json({ message: "Failed to edit message" });
+    }
+};
+
+export const deleteMessage = async (req, res) => {
+    const { messageId } = req.params;
+    const { mode } = req.query; // 'everyone' or 'me'
+    const userId = req.user.id;
+
+    try {
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: "Message not found" });
+        }
+
+        if (mode === 'everyone') {
+            if (message.sender.toString() !== userId) {
+                return res.status(403).json({ message: "Not authorized to delete this message for everyone" });
+            }
+            message.isDeleted = true;
+            message.text = "This message was deleted";
+            await message.save();
+        } else {
+            // Delete for me
+            if (!message.deletedBy.includes(userId)) {
+                message.deletedBy.push(userId);
+                await message.save();
+            }
+        }
+
+        res.json({ success: true, messageId });
+    } catch (error) {
+        console.error("Error deleting message:", error);
+        res.status(500).json({ message: "Failed to delete message" });
+    }
+};

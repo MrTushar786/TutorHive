@@ -21,10 +21,9 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true },
     password: {
       type: String,
-      required: function () { return !this.googleId; },
+      required: true,
       minlength: 6
     },
-    googleId: { type: String, unique: true, sparse: true },
     role: {
       type: String,
       required: true,
