@@ -8,6 +8,7 @@ function mapSession(booking) {
   return {
     id: booking._id,
     tutor: booking.tutor?.name,
+    avatar: booking.tutor?.avatar,
     tutorId: booking.tutor?._id,
     subject: booking.subject,
     startTime: booking.startTime,

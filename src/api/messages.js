@@ -33,3 +33,11 @@ export async function deleteMessage(messageId, mode, token) {
         token
     });
 }
+
+export async function initiateChat(targetUserId, token) {
+    return apiRequest("/messages/initiate", {
+        method: "POST",
+        data: { targetUserId },
+        token
+    });
+}

@@ -21,6 +21,11 @@ const conversationSchema = new mongoose.Schema({
         of: Number,
         default: {}
     },
+    clearedHistoryAt: {
+        type: Map,
+        of: Date,
+        default: {}
+    },
     hiddenFor: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"

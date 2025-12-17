@@ -4,8 +4,17 @@ import { createWSClient } from "../utils/wsClient";
 import { ArrowLeft, MoreVertical, Edit2, Trash2, Check, X } from "lucide-react";
 import { editMessage, deleteMessage } from "../api/messages";
 
-function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation, onMarkAsRead }) {
+function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation, onMarkAsRead, targetConversation, onMessageReceived }) {
   const [selectedConversation, setSelectedConversation] = useState(null);
+
+  useEffect(() => {
+    if (targetConversation) {
+      setSelectedConversation(targetConversation);
+      if (targetConversation.unreadCount > 0 && onMarkAsRead) {
+        onMarkAsRead(targetConversation.id);
+      }
+    }
+  }, [targetConversation]);
   const [messageText, setMessageText] = useState("");
   const [messages, setMessages] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
@@ -48,6 +57,8 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
           setMessages(data.messages || []);
         } else if (data.type === "new-message") {
           setMessages((prev) => [...prev, data.message]);
+          // Notify parent (dashboard) to refresh conversation list (e.g. bring to top, update preview)
+          if (onMessageReceived) onMessageReceived(data.message);
         }
       },
       onError: () => setWsConnected(false),
@@ -77,6 +88,8 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
     };
     setMessages((prev) => [...prev, localMessage]);
     setMessageText("");
+
+    if (onSendMessage) onSendMessage(selectedConversation.id, messageText);
   };
 
   const startEditing = (msg) => {
@@ -177,7 +190,7 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
                 className={`conversation-item ${selectedConversation?.id === conv.id ? "active" : ""}`}
                 onClick={() => {
                   setSelectedConversation(conv);
-                  if (conv.unreadCount > 0 && onMarkAsRead) onMarkAsRead(conv.id);
+                  if (onMarkAsRead) onMarkAsRead(conv.id);
                 }}
               >
                 <div className="conversation-avatar">
@@ -347,7 +360,10 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
               </button>
               <button
                 className={`modal-btn ${confirmationModal.isDanger ? "danger" : "primary"}`}
-                onClick={confirmationModal.onConfirm}
+                onClick={() => {
+                  confirmationModal.onConfirm();
+                  closeConfirmation();
+                }}
               >
                 Confirm
               </button>

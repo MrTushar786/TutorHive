@@ -8,7 +8,10 @@ import {
   Settings,
   UserPen,
   LogOut,
-  User
+  User,
+  Video,
+  Check,
+  X
 } from "lucide-react";
 import "./TutorDashboard.css";
 import useAuth from "../hooks/useAuth";
@@ -17,7 +20,8 @@ import { getMySessions, updateBookingStatus, generateMeetingRoom } from "../api/
 import ProfileEdit from "../components/ProfileEdit";
 import Messaging from "../components/Messaging";
 import { getConversationId } from "../hooks/useConversationId";
-import { getConversations } from "../api/messages";
+import { getConversations, initiateChat } from "../api/messages";
+import ErrorBoundary from "../utils/ErrorBoundary";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-US", {
@@ -70,6 +74,7 @@ export default function TutorDashboard() {
     localStorage.setItem("tutorDeletedConvIds", JSON.stringify(deletedConvIds));
   }, [deletedConvIds]);
   const [realConversations, setRealConversations] = useState([]);
+  const [targetConversation, setTargetConversation] = useState(null);
 
   // Restore conversation if it reappears from backend
   useEffect(() => {
@@ -153,11 +158,24 @@ export default function TutorDashboard() {
     if (!token) return;
     try {
       const data = await getConversations(token);
-      setRealConversations(data);
+
+      // Augment with local student data if needed/possible
+      const students = dashboardData?.myStudents || [];
+      const augmented = data.map(conv => {
+        if (conv.otherUserId) {
+          const match = students.find(s => (s.id === conv.otherUserId || s._id === conv.otherUserId));
+          if (match) {
+            return { ...conv, name: match.name, avatar: match.avatar || conv.avatar };
+          }
+        }
+        return conv;
+      });
+
+      setRealConversations(augmented);
     } catch (err) {
       console.error("Failed to load conversations", err);
     }
-  }, [token]);
+  }, [token, dashboardData]);
 
   useEffect(() => {
     if (activeTab === "messages") {
@@ -193,6 +211,40 @@ export default function TutorDashboard() {
   const openSessionModal = (student) => {
     setSelectedStudent(student);
     setSessionModal(true);
+  };
+
+  const handleMessageStudent = async (student) => {
+    try {
+      if (!user?._id || !token) return;
+      const targetId = student.id || student._id;
+
+      let conversation = await initiateChat(targetId, token);
+
+      // Manually attach student details to ensure they display correctly immediately
+      conversation = {
+        ...conversation,
+        name: student.name || "Student",
+        avatar: student.avatar,
+        otherUserId: targetId
+      };
+
+      // Update local state to include this conversation immediately
+      setRealConversations(prev => {
+        const exists = prev.find(c => c.id === conversation.id);
+        if (exists) {
+          return prev.map(c => c.id === conversation.id ? { ...c, name: student.name, avatar: student.avatar } : c);
+        }
+        return [conversation, ...prev];
+      });
+
+      // Remove from deleted list if it was there
+      setDeletedConvIds(prev => prev.filter(id => id !== conversation.id));
+
+      setTargetConversation(conversation);
+      setActiveTab("messages");
+    } catch (err) {
+      console.error("Failed to start chat", err);
+    }
   };
 
   const closeSessionModal = () => {
@@ -495,56 +547,45 @@ export default function TutorDashboard() {
 
             <div className="students-grid">
               {filteredStudents.map((student) => (
-                <div key={student.id} className="student-card">
-                  <div className="student-card-header">
-                    <div className="student-avatar-large">
+                <div key={student.id} className="student-card-compact">
+                  <div className="student-header-compact">
+                    <div className="student-avatar-compact-wrapper">
                       {student.avatar?.startsWith("data:") || student.avatar?.startsWith("http") ? (
-                        <img src={student.avatar} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        <img src={student.avatar} alt={student.name} />
                       ) : (
-                        student.avatar || "👩‍🎓"
+                        <div className="avatar-placeholder" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
+                          {student.avatar || "👨‍🎓"}
+                        </div>
                       )}
                     </div>
-                    <h3 className="student-name">{student.name}</h3>
-                    <div className="student-subject">{student.subject || "General Student"}</div>
-                  </div>
+                    <div className="student-info-compact">
+                      <div className="student-name-row">
+                        <h3>{student.name}</h3>
+                        <div className="student-rating-pill">
+                          <span>⭐</span>
+                          <span>4.8</span>
+                        </div>
+                      </div>
+                      <div className="student-subject-text">{student.subject || "General"}</div>
 
-                  <div className="student-card-body">
-                    <div className="student-stats-grid">
-                      <div className="student-stat-item profit">
-                        <div className="stat-label">Total Profit</div>
-                        <div className="stat-value highlight">{formatCurrency(student.totalEarnings || 0)}</div>
+                      <div className="student-stats-row">
+                        <span>📅 {formatDate(student.lastSession)}</span>
+                        <span>⏱️ {(student.totalHours || 0).toFixed(1)}h</span>
                       </div>
-                      <div className="student-stat-item">
-                        <div className="stat-label">Hours</div>
-                        <div className="stat-value">{(student.totalHours || 0).toFixed(1)}h</div>
-                      </div>
-                      <div className="student-stat-item">
-                        <div className="stat-label">Sessions</div>
-                        <div className="stat-value">{student.sessions}</div>
-                      </div>
-                    </div>
-
-                    <div className="student-last-session">
-                      <span className="icon">📅</span>
-                      <span>Last: {formatDate(student.lastSession)}</span>
                     </div>
                   </div>
 
-                  <div className="student-card-footer two-buttons">
-                    <button
-                      className="action-btn secondary"
-                      onClick={() => setActiveTab("messages")}
-                      type="button"
-                      title="Message Student"
-                    >
-                      💬 Message
-                    </button>
-                    <button
-                      className="action-btn primary"
-                      onClick={() => openSessionModal(student)}
-                      type="button"
-                    >
-                      Start Session
+                  <div className="student-tags">
+                    <span className="student-tag">{student.subject || "General"}</span>
+                    <span className="student-tag">Regular</span>
+                  </div>
+
+                  <div className="student-card-footer-compact">
+                    <div className="student-earnings">
+                      {formatCurrency(student.totalEarnings || 0)} <span>earned</span>
+                    </div>
+                    <button className="join-btn-pill" onClick={() => openSessionModal(student)}>
+                      <span>Start Session</span>
                     </button>
                   </div>
                 </div>
@@ -594,95 +635,74 @@ export default function TutorDashboard() {
                 <p>No {sessionsFilter} sessions found.</p>
               </div>
             ) : (
-              <div className="sessions-list-detailed">
+              <div className="sessions-list">
                 {sessions.map((session) => (
-                  <div key={session.id} className="session-card-detailed">
-                    <div className="session-card-left">
-                      <div className="session-date-box">
-                        <div className="date-day">{formatShortDay(session.startTime)}</div>
-                        <div className="date-month">{formatShortMonth(session.startTime)}</div>
+                  <div key={session.id} className="session-card-simple">
+                    <div className="simple-card-left">
+                      <div className="simple-date-box">
+                        <span className="day">{new Date(session.startTime).getDate()}</span>
+                        <span className="month">{new Date(session.startTime).toLocaleString('default', { month: 'short' }).toUpperCase()}</span>
                       </div>
                     </div>
-                    <div className="session-card-middle">
-                      <div className="session-main-info">
-                        <h3>{session.subject}</h3>
-                        <div className="session-tutor-info">
-                          <span className="tutor-avatar-small">
+
+                    <div className="simple-card-middle">
+                      <div className="simple-header">
+                        <h3 className="simple-subject">{session.subject}</h3>
+                        <span className={`simple-status ${session.status}`}>{session.status}</span>
+                      </div>
+
+                      <div className="simple-meta-row">
+                        <span className="simple-meta">
+                          <span className="tutor-avatar-micro">
                             {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
-                              <img src={session.avatar} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              <img src={session.avatar} alt="" />
                             ) : (
-                              session.avatar || "👨‍🎓"
+                              <User size={14} />
                             )}
                           </span>
-                          <span>{session.student}</span>
-                        </div>
+                          {session.student}
+                        </span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta">
+                          <Calendar size={14} style={{ marginRight: 4 }} /> {formatTime(session.startTime)}
+                        </span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta">
+                          {session.duration} min
+                        </span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta">
+                          ${session.price}
+                        </span>
                       </div>
-                      <div className="session-meta">
-                        <div className="meta-item">
-                          <span className="meta-icon">⏰</span>
-                          <span>{formatTime(session.startTime)}</span>
-                        </div>
-                        <div className="meta-item">
-                          <span className="meta-icon">⏱️</span>
-                          <span>{session.duration} minutes</span>
-                        </div>
-                        <div className="meta-item">
-                          <span className="meta-icon">💰</span>
-                          <span>${session.price}</span>
-                        </div>
-                      </div>
-                      {session.feedback && (
-                        <div className="session-feedback" style={{ marginTop: '1rem', padding: '0.5rem', background: '#f5f5f5', borderRadius: '8px' }}>
-                          <div className="feedback-rating" style={{ color: '#FFD700' }}>{"⭐".repeat(session.feedback.rating)}</div>
-                          {session.feedback.comment && (
-                            <div className="feedback-comment" style={{ fontStyle: 'italic', fontSize: '0.9rem', color: '#666' }}>
-                              "{session.feedback.comment}"
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
-                    <div className="session-card-right">
-                      <span className={`status-badge ${session.status}`}>{session.status}</span>
-                      <div className="session-actions">
-                        {session.status === "pending" && (
-                          <button
-                            className="action-btn primary"
-                            onClick={() => handleConfirmSession(session)}
-                            type="button"
-                          >
-                            Confirm
-                          </button>
-                        )}
-                        {sessionsFilter === "upcoming" && session.status === "confirmed" && (
-                          <>
-                            <button
-                              className="action-btn primary"
-                              onClick={() => handleJoinSession(session)}
-                              type="button"
-                            >
-                              Start Session
-                            </button>
-                            <button
-                              className="action-btn"
-                              onClick={() => handleMarkComplete(session)}
-                              type="button"
-                              style={{ background: '#4CAF50', color: 'white', marginLeft: '0.5rem' }}
-                            >
-                              Mark Complete
-                            </button>
-                          </>
-                        )}
-                        {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
-                          <button
-                            className="action-btn danger"
-                            onClick={() => handleCancelSession(session)}
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
+
+                    <div className="simple-actions">
+                      <button
+                        className="btn-simple secondary"
+                        onClick={() => handleMessageStudent({ id: session.studentId, name: session.student, avatar: session.avatar })}
+                        title="Message"
+                      >
+                        <MessageSquare size={20} />
+                      </button>
+
+                      {sessionsFilter === "upcoming" && session.status === "confirmed" && (
+                        <button className="btn-simple primary" onClick={() => handleJoinSession(session)}>
+                          <Video size={16} style={{ marginRight: 6 }} /> Join
+                        </button>
+                      )}
+
+                      {session.status === "pending" && (
+                        <button className="btn-simple primary" onClick={() => handleConfirmSession(session)} style={{ background: '#4CAF50' }}>
+                          <Check size={16} style={{ marginRight: 6 }} /> Confirm
+                        </button>
+                      )}
+
+                      {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
+                        <button className="btn-simple danger" onClick={() => handleCancelSession(session)} title="Cancel">
+                          <X size={20} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -756,59 +776,84 @@ export default function TutorDashboard() {
 
         {activeTab === "messages" && (
           <div className="messages-content">
-            <Messaging
-              currentUser={user}
-              token={token}
-              conversations={(() => {
-                const activeIds = new Set(realConversations.map((c) => c.id));
-                const potentialConversations = myStudents
-                  .map((student) => {
-                    const otherId = student.id || student._id;
-                    const convId = getConversationId(user?._id, otherId);
-                    if (!convId) return null;
-                    if (activeIds.has(convId)) return null;
-                    if (deletedConvIds.includes(convId)) return null;
-                    return {
-                      id: convId,
-                      name: student.name,
-                      avatar: student.avatar,
-                      lastMessage: "Click to start conversation",
-                      messages: [],
-                      unreadCount: 0,
-                      isPotential: true,
-                    };
-                  })
-                  .filter(Boolean);
+            <ErrorBoundary>
+              <Messaging
+                currentUser={user}
+                token={token}
+                targetConversation={targetConversation}
+                conversations={(() => {
+                  const uniqueMap = new Map();
 
-                return [...realConversations, ...potentialConversations].filter(c => !deletedConvIds.includes(c.id));
-              })()}
-              onSendMessage={(conversationId, message) => {
-                console.log("Sending message:", conversationId, message);
-              }}
-              onDeleteConversation={async (convId) => {
-                // Always hide locally first (persistent)
-                setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
-                // If it's a real conversation, tell backend
-                try {
-                  await import("../api/messages").then(m => m.deleteChat(convId, token));
-                  setRealConversations(prev => prev.filter(c => c.id !== convId));
-                } catch (e) {
-                  // Ignore
-                }
-              }}
-              onMarkAsRead={async (convId) => {
-                // Optimistically update local state
-                setRealConversations(prev => prev.map(c =>
-                  c.id === convId ? { ...c, unreadCount: 0 } : c
-                ));
-                // Call backend
-                try {
-                  await import("../api/messages").then(m => m.markAsRead(convId, token));
-                } catch (e) {
-                  console.error("Failed to mark as read", e);
-                }
-              }}
-            />
+                  // Add real conversations first (server truth)
+                  const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
+                  visible.forEach(c => {
+                    if (c && c.id) uniqueMap.set(String(c.id), c);
+                  });
+
+                  // Ensure target conversation is included
+                  if (targetConversation && targetConversation.id) {
+                    const targetId = String(targetConversation.id);
+                    if (!uniqueMap.has(targetId)) {
+                      // If not in list, add it (e.g. new chat)
+                      // Prepend or append? Map preserves insertion order.
+                      // If we want it at top, we should have added it first?
+                      // But if we add it first, we might overwrite it with "stale" info?
+                      // Actually, realConversations is better data. 
+                      // So keep real if exists. If not, add target.
+                      // To force it to top visually, we might need array spread.
+
+                      // But Map set appends.
+                      // Let's just return [...values] and maybe sort?
+                      // Or simple approach:
+                      return [targetConversation, ...Array.from(uniqueMap.values())];
+                    }
+                  }
+
+                  return Array.from(uniqueMap.values());
+                })()}
+                onSendMessage={(conversationId, message) => {
+                  loadConversations();
+                }}
+                onDeleteConversation={async (convId) => {
+                  console.log("Deleting conversation:", convId);
+
+                  if (targetConversation && targetConversation.id === convId) {
+                    setTargetConversation(null);
+                  }
+
+                  setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
+                  const apiUrl = import.meta.env.VITE_API_URL || "";
+                  try {
+                    await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
+                      method: 'DELETE',
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    setTimeout(loadConversations, 100);
+                  } catch (e) {
+                    console.error("Failed to delete", e);
+                  }
+                }}
+                onMarkAsRead={async (convId) => {
+                  setRealConversations(prev => prev.map(c =>
+                    c.id === convId ? { ...c, unreadCount: 0 } : c
+                  ));
+
+                  const apiUrl = import.meta.env.VITE_API_URL || "";
+                  try {
+                    await fetch(`${apiUrl}/api/messages/mark-read`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ conversationId: convId })
+                    });
+                    loadConversations();
+                  } catch (e) { console.error("Failed to mark read", e); }
+                }}
+                onMessageReceived={loadConversations}
+              />
+            </ErrorBoundary>
           </div>
         )}
 

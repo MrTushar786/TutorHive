@@ -172,13 +172,14 @@ export async function getMySessions(req, res) {
 
   const now = new Date();
   if (status === "upcoming" || !status) {
-    // For upcoming, show all active sessions regardless of time (so they don't disappear if forgotten)
-    // query.endTime = { $gt: now }; 
-    query.status = { $nin: ["cancelled", "completed", "no-show"] };
+    // Explicitly include pending and confirmed.
+    // We want to show ANY session that is not cancelled/completed/no-show, 
+    // effectively showing all active workflows.
+    query.status = { $in: ["pending", "confirmed"] };
   } else if (status === "completed") {
     query.status = "completed";
   } else if (status === "cancelled") {
-    query.status = "cancelled";
+    query.status = { $in: ["cancelled", "no-show"] }; // Include no-show in cancelled view for clarity
   } else if (status && status !== "all") {
     query.status = status;
   }
@@ -193,7 +194,9 @@ export async function getMySessions(req, res) {
     const sessions = bookings.map((booking) => ({
       id: booking._id.toString(),
       tutor: role === "student" ? booking.tutor?.name : undefined,
+      tutorId: role === "student" ? booking.tutor?._id : undefined,
       student: role === "tutor" ? booking.student?.name : undefined,
+      studentId: role === "tutor" ? booking.student?._id : undefined,
       subject: booking.subject,
       startTime: booking.startTime,
       duration: booking.duration,

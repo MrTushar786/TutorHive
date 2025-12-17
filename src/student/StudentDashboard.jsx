@@ -10,15 +10,23 @@ import {
   LogOut,
   User,
   BookOpen,
+  X,
+  Video,
   Clock,
+  Hourglass,
+  DollarSign,
+  Star,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Check,
+  ArrowLeft,
+  GraduationCap,
   Target,
   CheckCircle,
-  Hourglass,
   XCircle,
   Trophy,
-  Star,
-  Flame,
-  Zap
+  Flame
 } from "lucide-react";
 import "./StudentDashboard.css";
 import useAuth from "../hooks/useAuth";
@@ -28,7 +36,7 @@ import RescheduleDialog from "../components/RescheduleDialog";
 import ProfileEdit from "../components/ProfileEdit";
 import Messaging from "../components/Messaging";
 import { getConversationId } from "../hooks/useConversationId";
-import { getConversations } from "../api/messages";
+import { getConversations, initiateChat } from "../api/messages";
 import ErrorBoundary from "../utils/ErrorBoundary";
 
 const DURATION_OPTIONS = [
@@ -90,6 +98,7 @@ export default function StudentDashboard() {
     localStorage.setItem("deletedConvIds", JSON.stringify(deletedConvIds));
   }, [deletedConvIds]);
   const [realConversations, setRealConversations] = useState([]);
+  const [targetConversation, setTargetConversation] = useState(null);
 
   // Restore conversation if it reappears from backend (e.g. new message received)
   useEffect(() => {
@@ -228,6 +237,37 @@ export default function StudentDashboard() {
       return matchesSearch && matchesSubject;
     });
   }, [availableTutors, searchQuery, selectedSubject]);
+
+  const handleMessageTutor = async (tutor) => {
+    console.log("handleMessageTutor called with:", tutor);
+    try {
+      if (!user?._id || !token) {
+        console.error("Missing user or token");
+        return;
+      }
+      const targetId = tutor.id || tutor._id || tutor.tutorId;
+
+      if (!targetId) {
+        console.error("No target ID found", tutor);
+        return;
+      }
+
+      const conversation = await initiateChat(targetId, token);
+
+      setRealConversations(prev => {
+        const exists = prev.find(c => c.id === conversation.id);
+        if (exists) return prev;
+        return [conversation, ...prev];
+      });
+
+      setDeletedConvIds(prev => prev.filter(id => id !== conversation.id));
+
+      setTargetConversation(conversation);
+      setActiveTab("messages");
+    } catch (err) {
+      console.error("Failed to start chat", err);
+    }
+  };
 
   const openBookingModal = (tutor) => {
     setSelectedTutor(tutor);
@@ -580,47 +620,54 @@ export default function StudentDashboard() {
 
             <div className="tutors-grid">
               {filteredTutors.map((tutor) => (
-                <div key={tutor.id} className="tutor-card">
-                  <div className="tutor-card-header">
-                    <div className="tutor-avatar-large">
+                <div key={tutor.id} className="tutor-card-compact">
+                  <div className="tutor-header-compact">
+                    <div className="tutor-avatar-compact">
                       {tutor.avatar?.startsWith("data:") || tutor.avatar?.startsWith("http") ? (
-                        <img src={tutor.avatar} alt={tutor.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        <img src={tutor.avatar} alt={tutor.name} />
                       ) : (
-                        tutor.avatar || "👩‍🏫"
+                        <div className="avatar-placeholder"><User size={24} /></div>
                       )}
                     </div>
-                    <div className="tutor-rating">
-                      <span className="star">⭐</span>
-                      <span className="rating-value">{tutor.rating}</span>
-                      <span className="rating-count">({tutor.reviews})</span>
+                    <div className="tutor-info-compact">
+                      <div className="tutor-name-row">
+                        <h3>{tutor.name}</h3>
+                        <div className="tutor-rating-pill">
+                          <Star size={12} fill="#FFB800" stroke="none" />
+                          <span>{tutor.rating}</span>
+                        </div>
+                      </div>
+                      <div className="tutor-subject-text">{tutor.subject}</div>
                     </div>
                   </div>
-                  <div className="tutor-card-body">
-                    <h3 className="tutor-name">{tutor.name}</h3>
-                    <div className="tutor-subject">{tutor.subject}</div>
-                    <div className="tutor-experience">
-                      <span className="icon">🎓</span>
+
+                  <div className="tutor-stats-compact">
+                    <div className="stat-item">
+                      <GraduationCap size={14} className="tutor-stat-icon" />
                       <span>{tutor.experience}</span>
                     </div>
-                    <div className="tutor-expertise">
-                      {(tutor.expertise || []).map((skill) => (
-                        <span key={skill} className="expertise-tag">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="tutor-availability">
-                      <span className="icon">📅</span>
+                    <div className="stat-item">
+                      <Calendar size={14} className="tutor-stat-icon" />
                       <span>{tutor.availability}</span>
                     </div>
                   </div>
-                  <div className="tutor-card-footer">
-                    <div className="tutor-price">
-                      <span className="price-amount">${tutor.hourlyRate || 0}</span>
-                      <span className="price-unit">/hour</span>
+
+                  <div className="tutor-tags-compact">
+                    {(tutor.expertise || []).slice(0, 3).map(skill => (
+                      <span key={skill} className="compact-tag">{skill}</span>
+                    ))}
+                    {(tutor.expertise || []).length > 3 && (
+                      <span className="compact-tag more">+{tutor.expertise.length - 3}</span>
+                    )}
+                  </div>
+
+                  <div className="tutor-footer-compact">
+                    <div className="price-compact">
+                      <span className="amount">${tutor.hourlyRate}</span>
+                      <span className="unit">/hr</span>
                     </div>
-                    <button className="book-btn" onClick={() => openBookingModal(tutor)}>
-                      Book Session
+                    <button className="book-btn-compact" onClick={() => openBookingModal(tutor)}>
+                      Book
                     </button>
                   </div>
                 </div>
@@ -672,85 +719,102 @@ export default function StudentDashboard() {
             ) : (
               <div className="sessions-list-detailed">
                 {sessions.map((session) => (
-                  <div key={session.id} className="session-card-detailed">
-                    <div className="session-card-left">
-                      <div className="session-date-box">
-                        <div className="date-day">{formatShortDay(session.startTime)}</div>
-                        <div className="date-month">{formatShortMonth(session.startTime)}</div>
+                  <div key={session.id} className="session-card-simple">
+                    <div className="simple-card-left">
+                      <div className="simple-date-box">
+                        <span className="day">{formatShortDay(session.startTime)}</span>
+                        <span className="month">{formatShortMonth(session.startTime)}</span>
                       </div>
                     </div>
-                    <div className="session-card-middle">
-                      <div className="session-main-info">
-                        <h3>{session.subject}</h3>
-                        <div className="session-tutor-info">
-                          <span className="tutor-avatar-small">
+
+                    <div className="simple-card-middle">
+                      <div className="simple-header">
+                        <h3 className="simple-subject">{session.subject}</h3>
+                        <span className={`simple-status ${session.status}`}>{session.status}</span>
+                      </div>
+
+                      <div className="simple-meta-row">
+                        <span className="simple-meta">
+                          <span className="tutor-avatar-micro">
                             {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
-                              <img src={session.avatar} alt="Tutor" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              <img src={session.avatar} alt="" />
                             ) : (
-                              session.avatar || "👩‍🏫"
+                              <User size={14} />
                             )}
                           </span>
-                          <span>{session.tutor}</span>
-                        </div>
+                          {session.tutor}
+                        </span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta"><Clock size={14} style={{ marginRight: 4 }} /> {formatTime(session.startTime)}</span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta"><Hourglass size={14} style={{ marginRight: 4 }} /> {session.duration} min</span>
+                        <span className="simple-dot">•</span>
+                        <span className="simple-meta"><DollarSign size={14} style={{ marginRight: 1 }} /> {session.price || session.hourlyRate || 0}</span>
                       </div>
-                      <div className="session-meta">
-                        <div className="meta-item">
-                          <span className="meta-icon">⏰</span>
-                          <span>{formatTime(session.startTime)}</span>
-                        </div>
-                        <div className="meta-item">
-                          <span className="meta-icon">⏱️</span>
-                          <span>{session.duration} minutes</span>
-                        </div>
-                        <div className="meta-item">
-                          <span className="meta-icon">💰</span>
-                          <span>${session.price}</span>
-                        </div>
-                      </div>
+
                       {session.feedback && (
-                        <div className="session-feedback" style={{ marginTop: '1rem', padding: '0.5rem', background: '#f5f5f5', borderRadius: '8px' }}>
-                          <div className="feedback-rating" style={{ color: '#FFD700' }}>{"⭐".repeat(session.feedback.rating)}</div>
+                        <div className="simple-feedback-row">
+                          <span className="simple-stars" title={`Rating: ${session.feedback.rating}`}>
+                            {Array.from({ length: session.feedback.rating }).map((_, i) => (
+                              <Star key={i} size={12} fill="#FFD700" color="#FFD700" style={{ display: 'inline-block', marginRight: 1 }} />
+                            ))}
+                          </span>
                           {session.feedback.comment && (
-                            <div className="feedback-comment" style={{ fontStyle: 'italic', fontSize: '0.9rem', color: '#666' }}>
-                              "{session.feedback.comment}"
-                            </div>
+                            <span className="simple-comment">
+                              "{session.feedback.comment.length > 30 ? session.feedback.comment.substring(0, 30) + '...' : session.feedback.comment}"
+                            </span>
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="session-card-right">
-                      <span className={`status-badge ${session.status}`}>{session.status}</span>
-                      <div className="session-actions">
-                        {sessionsFilter === "upcoming" && (session.status === "confirmed" || session.status === "pending") && (
+
+                    <div className="simple-actions">
+                      <button
+                        className="btn-simple secondary"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Message clicked for", session.tutor);
+                          handleMessageTutor({ id: session.tutorId, name: session.tutor, avatar: session.avatar });
+                        }}
+                        type="button"
+                        title="Message"
+                      >
+                        <MessageSquare size={20} />
+                      </button>
+
+                      {sessionsFilter === "upcoming" && (session.status === "confirmed" || session.status === "pending") && (
+                        <button
+                          className="btn-simple primary"
+                          onClick={(e) => { e.stopPropagation(); handleJoinSession(session); }}
+                          disabled={session.status === "pending"}
+                          type="button"
+                          title={session.status === "pending" ? "Waiting for confirmation" : "Join Video Session"}
+                        >
+                          <Video size={16} style={{ marginRight: 6 }} /> Join
+                        </button>
+                      )}
+
+                      {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
+                        <>
                           <button
-                            className="action-btn primary"
-                            onClick={() => handleJoinSession(session)}
+                            className="btn-simple secondary"
+                            onClick={(e) => { e.stopPropagation(); handleReschedule(session); }}
                             type="button"
-                            disabled={session.status === "pending"}
-                            title={session.status === "pending" ? "Waiting for tutor confirmation" : "Join Session"}
+                            title="Reschedule"
                           >
-                            {session.status === "pending" ? "Pending Confirmation" : "Join Session"}
+                            <Calendar size={20} />
                           </button>
-                        )}
-                        {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
-                          <>
-                            <button
-                              className="action-btn secondary"
-                              onClick={() => handleReschedule(session)}
-                              type="button"
-                            >
-                              Reschedule
-                            </button>
-                            <button
-                              className="action-btn danger"
-                              onClick={() => handleCancelSession(session)}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
-                      </div>
+                          <button
+                            className="btn-simple danger"
+                            onClick={(e) => { e.stopPropagation(); handleCancelSession(session); }}
+                            type="button"
+                            title="Cancel"
+                          >
+                            <X size={20} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -874,41 +938,46 @@ export default function StudentDashboard() {
               <Messaging
                 currentUser={user}
                 token={token}
+                targetConversation={targetConversation}
                 conversations={(() => {
-                  const activeIds = new Set(realConversations.map((c) => c.id));
-                  const potentialConversations = availableTutors
-                    .map((tutor) => {
-                      const otherId = tutor.id || tutor._id;
-                      const convId = getConversationId(user?._id, otherId);
-                      if (!convId) return null;
-                      if (activeIds.has(convId)) return null;
-                      if (deletedConvIds.includes(convId)) return null;
-                      return {
-                        id: convId,
-                        name: tutor.name,
-                        avatar: tutor.avatar,
-                        lastMessage: "Click to start conversation",
-                        messages: [],
-                        unreadCount: 0,
-                        isPotential: true,
-                      };
-                    })
-                    .filter(Boolean);
+                  const uniqueMap = new Map();
 
-                  return [...realConversations, ...potentialConversations].filter(c => !deletedConvIds.includes(c.id));
+                  // Filter deleted
+                  const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
+                  visible.forEach(c => {
+                    if (c && c.id) uniqueMap.set(String(c.id), c);
+                  });
+
+                  if (targetConversation && targetConversation.id) {
+                    const targetId = String(targetConversation.id);
+                    if (!uniqueMap.has(targetId)) {
+                      return [targetConversation, ...Array.from(uniqueMap.values())];
+                    }
+                  }
+                  return Array.from(uniqueMap.values());
                 })()}
                 onSendMessage={(conversationId, message) => {
-                  console.log("Sending message:", conversationId, message);
+                  loadConversations();
                 }}
                 onDeleteConversation={async (convId) => {
-                  // Always hide locally first (persistent)
+                  console.log("Deleting conversation:", convId);
+
+                  // Clear targetConversation if it's the one being deleted
+                  if (targetConversation && targetConversation.id === convId) {
+                    setTargetConversation(null);
+                  }
+
                   setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
-                  // If it's a real conversation, tell backend
+                  const apiUrl = import.meta.env.VITE_API_URL || "";
                   try {
-                    await import("../api/messages").then(m => m.deleteChat(convId, token));
-                    setRealConversations(prev => prev.filter(c => c.id !== convId));
+                    await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
+                      method: 'DELETE',
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    // Wait a bit for backend to process before reloading
+                    setTimeout(loadConversations, 100);
                   } catch (e) {
-                    // Ignore 404s or errors for potential convs
+                    console.error("Failed to delete", e);
                   }
                 }}
                 onMarkAsRead={async (convId) => {
@@ -916,13 +985,21 @@ export default function StudentDashboard() {
                   setRealConversations(prev => prev.map(c =>
                     c.id === convId ? { ...c, unreadCount: 0 } : c
                   ));
-                  // Call backend
+
+                  const apiUrl = import.meta.env.VITE_API_URL || "";
                   try {
-                    await import("../api/messages").then(m => m.markAsRead(convId, token));
-                  } catch (e) {
-                    console.error("Failed to mark as read", e);
-                  }
+                    await fetch(`${apiUrl}/api/messages/mark-read`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ conversationId: convId })
+                    });
+                    loadConversations();
+                  } catch (e) { console.error("Failed to mark read", e); }
                 }}
+                onMessageReceived={loadConversations}
               />
             </ErrorBoundary>
           </div>

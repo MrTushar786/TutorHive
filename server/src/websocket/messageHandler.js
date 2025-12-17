@@ -1,4 +1,5 @@
 import { WebSocketServer } from "ws";
+import mongoose from "mongoose";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 
@@ -27,7 +28,7 @@ export function createMessageWebSocketServer() {
     try {
       const dbMessages = await Message.find({
         conversationId,
-        deletedBy: { $ne: userId }
+        deletedBy: { $ne: new mongoose.Types.ObjectId(userId) }
       })
         .sort({ createdAt: 1 })
         .populate("sender", "name");

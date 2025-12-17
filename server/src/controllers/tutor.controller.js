@@ -8,6 +8,7 @@ function mapTutorSession(booking) {
   return {
     id: booking._id,
     student: booking.student?.name,
+    avatar: booking.student?.avatar,
     studentId: booking.student?._id,
     subject: booking.subject,
     startTime: booking.startTime,
