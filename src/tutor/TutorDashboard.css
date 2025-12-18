@@ -108,24 +108,227 @@ body {
   overflow-y: auto;
 }
 
-.nav-item {
-  width: 100%;
+/* Modern Session Card Design */
+.sessions-list {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.session-card-simple {
+  display: flex;
   align-items: center;
-  justify-content: flex-start;
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.session-card-simple:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.simple-card-left {
+  flex-shrink: 0;
+}
+
+.simple-date-box {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 14px;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #2d3748;
+  border: 1px solid #dee2e6;
+}
+
+.simple-date-box .day {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #667eea;
+}
+
+.simple-date-box .month {
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #718096;
+}
+
+.simple-card-middle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.simple-header {
+  display: flex;
+  align-items: center;
   gap: 1rem;
-  padding: 0.8rem 1rem;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+}
+
+.simple-subject {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.simple-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.simple-status.confirmed {
+  background: #e6fffa;
+  color: #2c7a7b;
+}
+
+.simple-status.pending {
+  background: #fffaf0;
+  color: #dd6b20;
+}
+
+.simple-status.cancelled {
+  background: #fff5f5;
+  color: #c53030;
+}
+
+.simple-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   font-size: 0.95rem;
-  font-weight: 600;
+  color: #4a5568;
+}
+
+.simple-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tutor-avatar-micro {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #cbd5e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tutor-avatar-micro img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.simple-dot {
+  color: #cbd5e0;
+  font-size: 0.5rem;
+}
+
+.simple-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Modern Buttons */
+.btn-simple {
+  height: 42px;
   border-radius: 12px;
+  border: none;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 0.4rem;
-  position: relative;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+}
+
+.btn-simple.secondary {
+  width: 42px;
+  padding: 0;
+  background: #f7fafc;
+  color: #4a5568;
+  border: 1px solid #edf2f7;
+}
+
+.btn-simple.secondary:hover {
+  background: #edf2f7;
+  color: #2d3748;
+  border-color: #cbd5e0;
+}
+
+.btn-simple.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0 1.5rem;
+  box-shadow: 0 4px 12px rgba(118, 75, 162, 0.3);
+}
+
+.btn-simple.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(118, 75, 162, 0.4);
+}
+
+.btn-simple.success {
+  width: 42px;
+  padding: 0;
+  background: #c6f6d5 !important;
+  color: #2f855a !important;
+}
+
+.btn-simple.success:hover {
+  transform: translateY(-2px);
+  background: #9ae6b4 !important;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.btn-simple.danger {
+  width: 42px;
+  padding: 0;
+  background: #fff5f5;
+  color: #e53e3e;
+}
+
+.btn-simple.danger:hover {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+@media (max-width: 768px) {
+  .session-card-simple {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .simple-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+  }
 }
 
 .nav-item:hover {
@@ -470,6 +673,27 @@ body {
   justify-content: center;
   font-size: 1.3rem;
   flex-shrink: 0;
+}
+
+.activity-icon.completed {
+  background: linear-gradient(135deg, #4CAF50, #8BC34A);
+  box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+}
+
+.activity-icon.confirmed,
+.activity-icon.upcoming {
+  background: linear-gradient(135deg, #4A90E2, #00BCD4);
+  box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+}
+
+.activity-icon.pending {
+  background: linear-gradient(135deg, #FFC107, #FF9800);
+  box-shadow: 0 4px 10px rgba(255, 193, 7, 0.3);
+}
+
+.activity-icon.cancelled {
+  background: linear-gradient(135deg, #F44336, #E91E63);
+  box-shadow: 0 4px 10px rgba(244, 67, 54, 0.3);
 }
 
 .activity-details {

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -62,7 +63,15 @@ const formatShortDay = (value) => new Date(value).toLocaleDateString("en-US", { 
 const formatShortMonth = (value) => new Date(value).toLocaleDateString("en-US", { month: "short" });
 
 export default function StudentDashboard() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "dashboard";
+
+  const setActiveTab = (tab) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("tab", tab);
+    if (tab !== "messages") newParams.delete("chatId");
+    setSearchParams(newParams);
+  };
   const [selectedTutor, setSelectedTutor] = useState(null);
   const [bookingModal, setBookingModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,17 +109,18 @@ export default function StudentDashboard() {
   const [realConversations, setRealConversations] = useState([]);
   const [targetConversation, setTargetConversation] = useState(null);
 
-  // Restore conversation if it reappears from backend (e.g. new message received)
+  // Sync URL chatId to targetConversation
   useEffect(() => {
-    if (realConversations.length > 0 && deletedConvIds.length > 0) {
-      const activeRealIds = new Set(realConversations.map(c => c.id));
-      const newDeletedIds = deletedConvIds.filter(id => !activeRealIds.has(id));
-
-      if (newDeletedIds.length !== deletedConvIds.length) {
-        setDeletedConvIds(newDeletedIds);
+    const chatId = searchParams.get("chatId");
+    if (activeTab === "messages" && chatId && realConversations.length > 0) {
+      if (targetConversation?.id !== chatId) {
+        const conv = realConversations.find(c => c.id === chatId);
+        if (conv) setTargetConversation(conv);
       }
+    } else if (activeTab === "messages" && !chatId && targetConversation) {
+      setTargetConversation(null);
     }
-  }, [realConversations, deletedConvIds]);
+  }, [searchParams, activeTab, realConversations]);
 
   const dashboardLoadedRef = React.useRef(false);
 
@@ -262,8 +272,11 @@ export default function StudentDashboard() {
 
       setDeletedConvIds(prev => prev.filter(id => id !== conversation.id));
 
-      setTargetConversation(conversation);
-      setActiveTab("messages");
+      // Trigger URL update to open chat
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set("tab", "messages");
+      newParams.set("chatId", conversation.id);
+      setSearchParams(newParams);
     } catch (err) {
       console.error("Failed to start chat", err);
     }
@@ -434,12 +447,12 @@ export default function StudentDashboard() {
               onClick={() => setActiveTab(tab)}
             >
               <span className="nav-icon">
-                {tab === "dashboard" && <LayoutDashboard size={20} />}
-                {tab === "find-tutors" && <Search size={20} />}
-                {tab === "sessions" && <Calendar size={20} />}
-                {tab === "progress" && <TrendingUp size={20} />}
-                {tab === "messages" && <MessageSquare size={20} />}
-                {tab === "settings" && <Settings size={20} />}
+                {tab === "dashboard" && <LayoutDashboard size={20} strokeWidth={1.5} />}
+                {tab === "find-tutors" && <Search size={20} strokeWidth={1.5} />}
+                {tab === "sessions" && <Calendar size={20} strokeWidth={1.5} />}
+                {tab === "progress" && <TrendingUp size={20} strokeWidth={1.5} />}
+                {tab === "messages" && <MessageSquare size={20} strokeWidth={1.5} />}
+                {tab === "settings" && <Settings size={20} strokeWidth={1.5} />}
               </span>
               <span>{tab.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>
             </button>
@@ -452,7 +465,7 @@ export default function StudentDashboard() {
               {studentProfile?.avatar?.startsWith("data:") || studentProfile?.avatar?.startsWith("http") ? (
                 <img src={studentProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : (
-                studentProfile?.avatar || <User size={24} color="#666" />
+                studentProfile?.avatar || <User size={24} color="#666" strokeWidth={1.5} />
               )}
             </div>
             <div className="user-info">
@@ -469,11 +482,11 @@ export default function StudentDashboard() {
             type="button"
             title="Edit Profile"
           >
-            <UserPen size={18} />
+            <UserPen size={18} strokeWidth={1.5} />
             <span>Edit Profile</span>
           </button>
           <button className="logout-btn" onClick={logout} type="button">
-            <LogOut size={18} />
+            <LogOut size={18} strokeWidth={1.5} />
             <span>Logout</span>
           </button>
         </div>
@@ -490,7 +503,7 @@ export default function StudentDashboard() {
             <div className="stats-grid">
               <div className="stat-card orange">
                 <div className="stat-icon">
-                  <BookOpen size={28} color="white" />
+                  <BookOpen size={28} color="white" strokeWidth={1.5} />
                 </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.completedLessons}</div>
@@ -499,7 +512,7 @@ export default function StudentDashboard() {
               </div>
               <div className="stat-card blue">
                 <div className="stat-icon">
-                  <Calendar size={28} color="white" />
+                  <Calendar size={28} color="white" strokeWidth={1.5} />
                 </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.upcomingLessons}</div>
@@ -508,7 +521,7 @@ export default function StudentDashboard() {
               </div>
               <div className="stat-card purple">
                 <div className="stat-icon">
-                  <Clock size={28} color="white" />
+                  <Clock size={28} color="white" strokeWidth={1.5} />
                 </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.totalHours}</div>
@@ -517,7 +530,7 @@ export default function StudentDashboard() {
               </div>
               <div className="stat-card green">
                 <div className="stat-icon">
-                  <Target size={28} color="white" />
+                  <Target size={28} color="white" strokeWidth={1.5} />
                 </div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.progressPercentage}%</div>
@@ -545,7 +558,7 @@ export default function StudentDashboard() {
                         {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
                           <img src={session.avatar} alt="Tutor" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                         ) : (
-                          session.avatar || "👩‍🏫"
+                          session.avatar || <User size={24} strokeWidth={1.5} />
                         )}
                       </div>
                       <div className="session-details">
@@ -570,11 +583,11 @@ export default function StudentDashboard() {
                   {recentActivity.map((activity) => (
                     <div key={activity.id} className="activity-item">
                       <div className={`activity-icon ${activity.type || 'default'}`}>
-                        {activity.type === "completed" && <CheckCircle size={20} color="white" />}
-                        {(activity.type === "confirmed" || activity.type === "upcoming") && <Calendar size={20} color="white" />}
-                        {activity.type === "pending" && <Hourglass size={20} color="white" />}
-                        {activity.type === "cancelled" && <XCircle size={20} color="white" />}
-                        {!["completed", "confirmed", "upcoming", "pending", "cancelled"].includes(activity.type) && <Calendar size={20} color="white" />}
+                        {activity.type === "completed" && <CheckCircle size={20} color="white" strokeWidth={1.5} />}
+                        {(activity.type === "confirmed" || activity.type === "upcoming") && <Calendar size={20} color="white" strokeWidth={1.5} />}
+                        {activity.type === "pending" && <Hourglass size={20} color="white" strokeWidth={1.5} />}
+                        {activity.type === "cancelled" && <XCircle size={20} color="white" strokeWidth={1.5} />}
+                        {!["completed", "confirmed", "upcoming", "pending", "cancelled"].includes(activity.type) && <Calendar size={20} color="white" strokeWidth={1.5} />}
                       </div>
                       <div className="activity-details">
                         <div className="activity-message">{activity.message}</div>
@@ -586,462 +599,488 @@ export default function StudentDashboard() {
               </div>
             </div>
           </div>
-        )}
+        )
+        }
 
-        {activeTab === "find-tutors" && (
-          <div className="find-tutors-content">
-            <div className="page-header">
-              <h1>Find Your Perfect Tutor</h1>
-              <p>Browse through our expert tutors and book your next session</p>
-            </div>
-
-            <div className="search-filter-bar">
-              <div className="search-box">
-                <span className="search-icon">🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search by tutor name or subject..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        {
+          activeTab === "find-tutors" && (
+            <div className="find-tutors-content">
+              <div className="page-header">
+                <h1>Find Your Perfect Tutor</h1>
+                <p>Browse through our expert tutors and book your next session</p>
               </div>
-              <div className="filter-chips">
-                {subjects.map((subject) => (
-                  <button
-                    key={subject}
-                    className={`filter-chip ${selectedSubject === subject ? "active" : ""}`}
-                    onClick={() => setSelectedSubject(subject)}
-                  >
-                    {subject === "all" ? "All" : subject.replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </button>
+
+              <div className="search-filter-bar">
+                <div className="search-box">
+                  <span className="search-icon"><Search size={18} strokeWidth={1.5} /></span>
+                  <input
+                    type="text"
+                    placeholder="Search by tutor name or subject..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="filter-chips">
+                  {subjects.map((subject) => (
+                    <button
+                      key={subject}
+                      className={`filter-chip ${selectedSubject === subject ? "active" : ""}`}
+                      onClick={() => setSelectedSubject(subject)}
+                    >
+                      {subject === "all" ? "All" : subject.replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="tutors-grid">
+                {filteredTutors.map((tutor) => (
+                  <div key={tutor.id} className="tutor-card-compact">
+                    <div className="tutor-header-compact">
+                      <div className="tutor-avatar-compact">
+                        {tutor.avatar?.startsWith("data:") || tutor.avatar?.startsWith("http") ? (
+                          <img src={tutor.avatar} alt={tutor.name} />
+                        ) : (
+                          <div className="avatar-placeholder"><User size={24} strokeWidth={1.5} /></div>
+                        )}
+                      </div>
+                      <div className="tutor-info-compact">
+                        <div className="tutor-name-row">
+                          <h3>{tutor.name}</h3>
+                          <div className="tutor-rating-pill">
+                            <Star size={12} fill="#FFB800" stroke="none" />
+                            <span>{tutor.rating}</span>
+                          </div>
+                        </div>
+                        <div className="tutor-subject-text">{tutor.subject}</div>
+                      </div>
+                    </div>
+
+                    <div className="tutor-stats-compact">
+                      <div className="stat-item">
+                        <GraduationCap size={14} className="tutor-stat-icon" strokeWidth={1.5} />
+                        <span>{tutor.experience}</span>
+                      </div>
+                      <div className="stat-item">
+                        <Calendar size={14} className="tutor-stat-icon" strokeWidth={1.5} />
+                        <span>{tutor.availability}</span>
+                      </div>
+                    </div>
+
+                    <div className="tutor-tags-compact">
+                      {(tutor.expertise || []).slice(0, 3).map(skill => (
+                        <span key={skill} className="compact-tag">{skill}</span>
+                      ))}
+                      {(tutor.expertise || []).length > 3 && (
+                        <span className="compact-tag more">+{tutor.expertise.length - 3}</span>
+                      )}
+                    </div>
+
+                    <div className="tutor-footer-compact">
+                      <div className="price-compact">
+                        <span className="amount">${tutor.hourlyRate}</span>
+                        <span className="unit">/hr</span>
+                      </div>
+                      <button className="book-btn-compact" onClick={() => openBookingModal(tutor)}>
+                        Book
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+          )
+        }
 
-            <div className="tutors-grid">
-              {filteredTutors.map((tutor) => (
-                <div key={tutor.id} className="tutor-card-compact">
-                  <div className="tutor-header-compact">
-                    <div className="tutor-avatar-compact">
-                      {tutor.avatar?.startsWith("data:") || tutor.avatar?.startsWith("http") ? (
-                        <img src={tutor.avatar} alt={tutor.name} />
-                      ) : (
-                        <div className="avatar-placeholder"><User size={24} /></div>
-                      )}
-                    </div>
-                    <div className="tutor-info-compact">
-                      <div className="tutor-name-row">
-                        <h3>{tutor.name}</h3>
-                        <div className="tutor-rating-pill">
-                          <Star size={12} fill="#FFB800" stroke="none" />
-                          <span>{tutor.rating}</span>
+        {
+          activeTab === "sessions" && (
+            <div className="sessions-content">
+              <div className="page-header">
+                <h1>My Sessions</h1>
+                <p>Manage your upcoming and past tutoring sessions</p>
+              </div>
+
+              <div className="sessions-tabs">
+                <button
+                  className={`sessions-tab-btn ${sessionsFilter === "upcoming" ? "active" : ""}`}
+                  onClick={() => setSessionsFilter("upcoming")}
+                  type="button"
+                >
+                  Upcoming
+                </button>
+                <button
+                  className={`sessions-tab-btn ${sessionsFilter === "completed" ? "active" : ""}`}
+                  onClick={() => setSessionsFilter("completed")}
+                  type="button"
+                >
+                  Completed
+                </button>
+                <button
+                  className={`sessions-tab-btn ${sessionsFilter === "cancelled" ? "active" : ""}`}
+                  onClick={() => setSessionsFilter("cancelled")}
+                  type="button"
+                >
+                  Cancelled
+                </button>
+              </div>
+
+              {sessionsLoading ? (
+                <div className="state-message">
+                  <div className="spinner" />
+                  <p>Loading sessions...</p>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="state-message">
+                  <p>No {sessionsFilter} sessions found.</p>
+                </div>
+              ) : (
+                <div className="sessions-list-detailed">
+                  {sessions.map((session) => (
+                    <div key={session.id} className="session-card-simple">
+                      <div className="simple-card-left">
+                        <div className="simple-date-box">
+                          <span className="day">{formatShortDay(session.startTime)}</span>
+                          <span className="month">{formatShortMonth(session.startTime)}</span>
                         </div>
                       </div>
-                      <div className="tutor-subject-text">{tutor.subject}</div>
+
+                      <div className="simple-card-middle">
+                        <div className="simple-header">
+                          <h3 className="simple-subject">{session.subject}</h3>
+                          <span className={`simple-status ${session.status}`}>{session.status}</span>
+                        </div>
+
+                        <div className="simple-meta-row">
+                          <span className="simple-meta">
+                            <span className="tutor-avatar-micro">
+                              {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
+                                <img src={session.avatar} alt="" />
+                              ) : (
+                                <User size={14} strokeWidth={1.5} />
+                              )}
+                            </span>
+                            {session.tutor}
+                          </span>
+                          <span className="simple-dot">•</span>
+                          <span className="simple-meta"><Clock size={14} style={{ marginRight: 4 }} strokeWidth={1.5} /> {formatTime(session.startTime)}</span>
+                          <span className="simple-dot">•</span>
+                          <span className="simple-meta"><Hourglass size={14} style={{ marginRight: 4 }} strokeWidth={1.5} /> {session.duration} min</span>
+                          <span className="simple-dot">•</span>
+                          <span className="simple-meta"><DollarSign size={14} style={{ marginRight: 1 }} strokeWidth={1.5} /> {session.price || session.hourlyRate || 0}</span>
+                        </div>
+
+                        {session.feedback && (
+                          <div className="simple-feedback-row">
+                            <span className="simple-stars" title={`Rating: ${session.feedback.rating}`}>
+                              {Array.from({ length: session.feedback.rating }).map((_, i) => (
+                                <Star key={i} size={12} fill="#FFD700" color="#FFD700" style={{ display: 'inline-block', marginRight: 1 }} />
+                              ))}
+                            </span>
+                            {session.feedback.comment && (
+                              <span className="simple-comment">
+                                "{session.feedback.comment.length > 30 ? session.feedback.comment.substring(0, 30) + '...' : session.feedback.comment}"
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="simple-actions">
+                        <button
+                          className="btn-simple secondary"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("Message clicked for", session.tutor);
+                            handleMessageTutor({ id: session.tutorId, name: session.tutor, avatar: session.avatar });
+                          }}
+                          type="button"
+                          title="Message"
+                        >
+                          <MessageSquare size={20} strokeWidth={1.5} />
+                        </button>
+
+                        {sessionsFilter === "upcoming" && (session.status === "confirmed" || session.status === "pending") && (
+                          <button
+                            className="btn-simple primary"
+                            onClick={(e) => { e.stopPropagation(); handleJoinSession(session); }}
+                            disabled={session.status === "pending"}
+                            type="button"
+                            title={session.status === "pending" ? "Waiting for confirmation" : "Join Video Session"}
+                          >
+                            <Video size={16} style={{ marginRight: 6 }} strokeWidth={1.5} /> Join
+                          </button>
+                        )}
+
+                        {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
+                          <>
+                            <button
+                              className="btn-simple secondary"
+                              onClick={(e) => { e.stopPropagation(); handleReschedule(session); }}
+                              type="button"
+                              title="Reschedule"
+                            >
+                              <Calendar size={20} strokeWidth={1.5} />
+                            </button>
+                            <button
+                              className="btn-simple danger"
+                              onClick={(e) => { e.stopPropagation(); handleCancelSession(session); }}
+                              type="button"
+                              title="Cancel"
+                            >
+                              <X size={20} strokeWidth={1.5} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        {
+          activeTab === "progress" && (
+            <div className="progress-content">
+              <div className="page-header">
+                <h1>Learning Progress</h1>
+                <p>Track your improvement across different subjects</p>
+              </div>
+
+              <div className="progress-overview">
+                <div className="overall-progress-card">
+                  <h3>Overall Progress</h3>
+                  <div className="circular-progress">
+                    <svg viewBox="0 0 200 200" width="100%" height="100%">
+                      <circle cx="100" cy="100" r="80" fill="none" stroke="#f0f0f0" strokeWidth="20" />
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="80"
+                        fill="none"
+                        stroke="url(#gradient)"
+                        strokeWidth="20"
+                        strokeDasharray={`${stats.progressPercentage * 5.024} 502.4`}
+                        strokeLinecap="round"
+                        transform="rotate(-90 100 100)"
+                      />
+                      <defs>
+                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#FF6B35" />
+                          <stop offset="100%" stopColor="#9C27B0" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="progress-percentage">{stats.progressPercentage}%</div>
+                  </div>
+                  <div className="progress-stats-mini">
+                    <div className="mini-stat">
+                      <div className="mini-stat-icon"><BookOpen size={20} color="#FF6B35" strokeWidth={1.5} /></div>
+                      <div className="mini-stat-info">
+                        <div className="mini-stat-value">{stats.completedLessons}</div>
+                        <div className="mini-stat-label">Lessons</div>
+                      </div>
+                    </div>
+                    <div className="mini-stat">
+                      <div className="mini-stat-icon"><Clock size={20} color="#9C27B0" strokeWidth={1.5} /></div>
+                      <div className="mini-stat-info">
+                        <div className="mini-stat-value">{stats.totalHours}h</div>
+                        <div className="mini-stat-label">Hours</div>
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="tutor-stats-compact">
-                    <div className="stat-item">
-                      <GraduationCap size={14} className="tutor-stat-icon" />
-                      <span>{tutor.experience}</span>
+                <div className="achievements-card">
+                  <h3>Recent Achievements</h3>
+                  <div className="achievements-grid">
+                    <div className={`achievement-badge ${stats.completedLessons >= 1 ? '' : 'locked'}`}>
+                      <div className="badge-icon">
+                        <Trophy size={32} color="#D4AF37" fill="#FFD700" strokeWidth={1.5} />
+                      </div>
+                      <div className="badge-name">First Lesson</div>
                     </div>
-                    <div className="stat-item">
-                      <Calendar size={14} className="tutor-stat-icon" />
-                      <span>{tutor.availability}</span>
+                    <div className={`achievement-badge ${stats.progressPercentage >= 10 ? '' : 'locked'}`}>
+                      <div className="badge-icon">
+                        <Star size={32} color="#FFA000" fill="#FFC107" strokeWidth={1.5} />
+                      </div>
+                      <div className="badge-name">Rising Star</div>
+                    </div>
+                    <div className={`achievement-badge ${stats.completedLessons >= 2 ? '' : 'locked'}`}>
+                      <div className="badge-icon">
+                        <Flame size={32} color="#E64A19" fill="#FF5722" strokeWidth={1.5} />
+                      </div>
+                      <div className="badge-name">3 Lesson Streak</div>
+                    </div>
+                    <div className={`achievement-badge ${stats.completedLessons >= 3 ? '' : 'locked'}`}>
+                      <div className="badge-icon">
+                        <Target size={32} color="#C2185B" strokeWidth={1.5} />
+                      </div>
+                      <div className="badge-name">Scholar</div>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  <div className="tutor-tags-compact">
-                    {(tutor.expertise || []).slice(0, 3).map(skill => (
-                      <span key={skill} className="compact-tag">{skill}</span>
-                    ))}
-                    {(tutor.expertise || []).length > 3 && (
-                      <span className="compact-tag more">+{tutor.expertise.length - 3}</span>
-                    )}
-                  </div>
-
-                  <div className="tutor-footer-compact">
-                    <div className="price-compact">
-                      <span className="amount">${tutor.hourlyRate}</span>
-                      <span className="unit">/hr</span>
+              <div className="subject-progress-list">
+                <h3>Progress by Subject</h3>
+                {progressData.map((item, index) => {
+                  const colors = [
+                    "linear-gradient(90deg, #9C27B0, #E040FB)", // Purple
+                    "linear-gradient(90deg, #FF4081, #C2185B)", // Pink
+                    "linear-gradient(90deg, #FF6B35, #F44336)"  // Orange
+                  ];
+                  return (
+                    <div key={item.subject} className="subject-progress-item">
+                      <div className="subject-progress-header">
+                        <div className="subject-name">{item.subject}</div>
+                        <div className="subject-stats">
+                          <span>{item.lessons} lessons</span>
+                          <span className="progress-percent" style={{ color: index === 0 ? '#9C27B0' : index === 1 ? '#C2185B' : '#FF6B35' }}>{item.progress}%</span>
+                        </div>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${item.progress}%`,
+                            background: colors[index % colors.length]
+                          }}
+                        />
+                      </div>
                     </div>
-                    <button className="book-btn-compact" onClick={() => openBookingModal(tutor)}>
-                      Book
+                  );
+                })}
+              </div>
+            </div>
+          )
+        }
+
+        {
+          activeTab === "messages" && (
+            <div className="messages-content">
+              <ErrorBoundary>
+                <Messaging
+                  currentUser={user}
+                  token={token}
+                  targetConversation={targetConversation}
+                  conversations={(() => {
+                    const uniqueMap = new Map();
+
+                    // Filter deleted
+                    const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
+                    visible.forEach(c => {
+                      if (c && c.id) uniqueMap.set(String(c.id), c);
+                    });
+
+                    if (targetConversation && targetConversation.id) {
+                      const targetId = String(targetConversation.id);
+                      if (!uniqueMap.has(targetId)) {
+                        return [targetConversation, ...Array.from(uniqueMap.values())];
+                      }
+                    }
+                    return Array.from(uniqueMap.values());
+                  })()}
+                  onSendMessage={(conversationId, message) => {
+                    loadConversations();
+                  }}
+                  onDeleteConversation={async (convId) => {
+                    console.log("Deleting conversation:", convId);
+
+                    // Clear targetConversation if it's the one being deleted
+                    if (targetConversation && targetConversation.id === convId) {
+                      setTargetConversation(null);
+                    }
+
+                    setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
+                    const apiUrl = import.meta.env.VITE_API_URL || "";
+                    try {
+                      await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      // Wait a bit for backend to process before reloading
+                      setTimeout(loadConversations, 100);
+                    } catch (e) {
+                      console.error("Failed to delete", e);
+                    }
+                  }}
+                  onMarkAsRead={async (convId) => {
+                    // Optimistically update local state
+                    setRealConversations(prev => prev.map(c =>
+                      c.id === convId ? { ...c, unreadCount: 0 } : c
+                    ));
+
+                    const apiUrl = import.meta.env.VITE_API_URL || "";
+                    try {
+                      await fetch(`${apiUrl}/api/messages/mark-read`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ conversationId: convId })
+                      });
+                      loadConversations();
+                    } catch (e) { console.error("Failed to mark read", e); }
+                  }}
+                  onMessageReceived={loadConversations}
+                  onSelectConversation={(conv) => {
+                    const newParams = new URLSearchParams(searchParams);
+                    if (conv) {
+                      newParams.set("chatId", conv.id);
+                    } else {
+                      newParams.delete("chatId");
+                    }
+                    setSearchParams(newParams);
+                  }}
+                />
+              </ErrorBoundary>
+            </div>
+          )
+        }
+
+        {
+          activeTab === "settings" && (
+            <div className="settings-content">
+              <div className="page-header">
+                <h1>Settings</h1>
+                <p>Manage your account preferences</p>
+              </div>
+              {showProfileEdit ? (
+                <ProfileEdit
+                  user={studentProfile || user}
+                  token={token}
+                  onSave={() => {
+                    setShowProfileEdit(false);
+                    loadDashboard();
+                  }}
+                  onCancel={() => setShowProfileEdit(false)}
+                />
+              ) : (
+                <div className="settings-sections">
+                  <div className="settings-section">
+                    <h3>Profile Settings</h3>
+                    <p>Update your profile information and preferences.</p>
+                    <button className="btn-primary" onClick={() => setShowProfileEdit(true)}>
+                      Edit Profile
+                    </button>
+                  </div>
+                  <div className="settings-section">
+                    <h3>Account Settings</h3>
+                    <p>Manage your account preferences and security.</p>
+                    <button className="btn-secondary" disabled>
+                      Coming Soon
                     </button>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        )}
-
-        {activeTab === "sessions" && (
-          <div className="sessions-content">
-            <div className="page-header">
-              <h1>My Sessions</h1>
-              <p>Manage your upcoming and past tutoring sessions</p>
-            </div>
-
-            <div className="sessions-tabs">
-              <button
-                className={`sessions-tab-btn ${sessionsFilter === "upcoming" ? "active" : ""}`}
-                onClick={() => setSessionsFilter("upcoming")}
-                type="button"
-              >
-                Upcoming
-              </button>
-              <button
-                className={`sessions-tab-btn ${sessionsFilter === "completed" ? "active" : ""}`}
-                onClick={() => setSessionsFilter("completed")}
-                type="button"
-              >
-                Completed
-              </button>
-              <button
-                className={`sessions-tab-btn ${sessionsFilter === "cancelled" ? "active" : ""}`}
-                onClick={() => setSessionsFilter("cancelled")}
-                type="button"
-              >
-                Cancelled
-              </button>
-            </div>
-
-            {sessionsLoading ? (
-              <div className="state-message">
-                <div className="spinner" />
-                <p>Loading sessions...</p>
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="state-message">
-                <p>No {sessionsFilter} sessions found.</p>
-              </div>
-            ) : (
-              <div className="sessions-list-detailed">
-                {sessions.map((session) => (
-                  <div key={session.id} className="session-card-simple">
-                    <div className="simple-card-left">
-                      <div className="simple-date-box">
-                        <span className="day">{formatShortDay(session.startTime)}</span>
-                        <span className="month">{formatShortMonth(session.startTime)}</span>
-                      </div>
-                    </div>
-
-                    <div className="simple-card-middle">
-                      <div className="simple-header">
-                        <h3 className="simple-subject">{session.subject}</h3>
-                        <span className={`simple-status ${session.status}`}>{session.status}</span>
-                      </div>
-
-                      <div className="simple-meta-row">
-                        <span className="simple-meta">
-                          <span className="tutor-avatar-micro">
-                            {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
-                              <img src={session.avatar} alt="" />
-                            ) : (
-                              <User size={14} />
-                            )}
-                          </span>
-                          {session.tutor}
-                        </span>
-                        <span className="simple-dot">•</span>
-                        <span className="simple-meta"><Clock size={14} style={{ marginRight: 4 }} /> {formatTime(session.startTime)}</span>
-                        <span className="simple-dot">•</span>
-                        <span className="simple-meta"><Hourglass size={14} style={{ marginRight: 4 }} /> {session.duration} min</span>
-                        <span className="simple-dot">•</span>
-                        <span className="simple-meta"><DollarSign size={14} style={{ marginRight: 1 }} /> {session.price || session.hourlyRate || 0}</span>
-                      </div>
-
-                      {session.feedback && (
-                        <div className="simple-feedback-row">
-                          <span className="simple-stars" title={`Rating: ${session.feedback.rating}`}>
-                            {Array.from({ length: session.feedback.rating }).map((_, i) => (
-                              <Star key={i} size={12} fill="#FFD700" color="#FFD700" style={{ display: 'inline-block', marginRight: 1 }} />
-                            ))}
-                          </span>
-                          {session.feedback.comment && (
-                            <span className="simple-comment">
-                              "{session.feedback.comment.length > 30 ? session.feedback.comment.substring(0, 30) + '...' : session.feedback.comment}"
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="simple-actions">
-                      <button
-                        className="btn-simple secondary"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Message clicked for", session.tutor);
-                          handleMessageTutor({ id: session.tutorId, name: session.tutor, avatar: session.avatar });
-                        }}
-                        type="button"
-                        title="Message"
-                      >
-                        <MessageSquare size={20} />
-                      </button>
-
-                      {sessionsFilter === "upcoming" && (session.status === "confirmed" || session.status === "pending") && (
-                        <button
-                          className="btn-simple primary"
-                          onClick={(e) => { e.stopPropagation(); handleJoinSession(session); }}
-                          disabled={session.status === "pending"}
-                          type="button"
-                          title={session.status === "pending" ? "Waiting for confirmation" : "Join Video Session"}
-                        >
-                          <Video size={16} style={{ marginRight: 6 }} /> Join
-                        </button>
-                      )}
-
-                      {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
-                        <>
-                          <button
-                            className="btn-simple secondary"
-                            onClick={(e) => { e.stopPropagation(); handleReschedule(session); }}
-                            type="button"
-                            title="Reschedule"
-                          >
-                            <Calendar size={20} />
-                          </button>
-                          <button
-                            className="btn-simple danger"
-                            onClick={(e) => { e.stopPropagation(); handleCancelSession(session); }}
-                            type="button"
-                            title="Cancel"
-                          >
-                            <X size={20} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "progress" && (
-          <div className="progress-content">
-            <div className="page-header">
-              <h1>Learning Progress</h1>
-              <p>Track your improvement across different subjects</p>
-            </div>
-
-            <div className="progress-overview">
-              <div className="overall-progress-card">
-                <h3>Overall Progress</h3>
-                <div className="circular-progress">
-                  <svg width="200" height="200">
-                    <circle cx="100" cy="100" r="80" fill="none" stroke="#f0f0f0" strokeWidth="20" />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="80"
-                      fill="none"
-                      stroke="url(#gradient)"
-                      strokeWidth="20"
-                      strokeDasharray={`${stats.progressPercentage * 5.024} 502.4`}
-                      strokeLinecap="round"
-                      transform="rotate(-90 100 100)"
-                    />
-                    <defs>
-                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#FF6B35" />
-                        <stop offset="100%" stopColor="#9C27B0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="progress-percentage">{stats.progressPercentage}%</div>
-                </div>
-                <div className="progress-stats-mini">
-                  <div className="mini-stat">
-                    <div className="mini-stat-value">{stats.completedLessons}</div>
-                    <div className="mini-stat-label">Lessons</div>
-                  </div>
-                  <div className="mini-stat">
-                    <div className="mini-stat-value">{stats.totalHours}h</div>
-                    <div className="mini-stat-label">Hours</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="achievements-card">
-                <h3>Recent Achievements</h3>
-                <div className="achievements-grid">
-                  <div className={`achievement-badge ${stats.completedLessons >= 1 ? '' : 'locked'}`}>
-                    <div className="badge-icon">
-                      <Trophy size={32} color="#D4AF37" fill="#FFD700" strokeWidth={1.5} />
-                    </div>
-                    <div className="badge-name">First Lesson</div>
-                  </div>
-                  <div className={`achievement-badge ${stats.progressPercentage >= 10 ? '' : 'locked'}`}>
-                    <div className="badge-icon">
-                      <Star size={32} color="#FFA000" fill="#FFC107" strokeWidth={1.5} />
-                    </div>
-                    <div className="badge-name">Rising Star</div>
-                  </div>
-                  <div className={`achievement-badge ${stats.completedLessons >= 2 ? '' : 'locked'}`}>
-                    <div className="badge-icon">
-                      <Flame size={32} color="#E64A19" fill="#FF5722" strokeWidth={1.5} />
-                    </div>
-                    <div className="badge-name">3 Lesson Streak</div>
-                  </div>
-                  <div className={`achievement-badge ${stats.completedLessons >= 3 ? '' : 'locked'}`}>
-                    <div className="badge-icon">
-                      <Target size={32} color="#C2185B" strokeWidth={2} />
-                    </div>
-                    <div className="badge-name">Scholar</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="subject-progress-list">
-              <h3>Progress by Subject</h3>
-              {progressData.map((item, index) => {
-                const colors = [
-                  "linear-gradient(90deg, #9C27B0, #E040FB)", // Purple
-                  "linear-gradient(90deg, #FF4081, #C2185B)", // Pink
-                  "linear-gradient(90deg, #FF6B35, #F44336)"  // Orange
-                ];
-                return (
-                  <div key={item.subject} className="subject-progress-item">
-                    <div className="subject-progress-header">
-                      <div className="subject-name">{item.subject}</div>
-                      <div className="subject-stats">
-                        <span>{item.lessons} lessons</span>
-                        <span className="progress-percent" style={{ color: index === 0 ? '#9C27B0' : index === 1 ? '#C2185B' : '#FF6B35' }}>{item.progress}%</span>
-                      </div>
-                    </div>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{
-                          width: `${item.progress}%`,
-                          background: colors[index % colors.length]
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "messages" && (
-          <div className="messages-content">
-            <ErrorBoundary>
-              <Messaging
-                currentUser={user}
-                token={token}
-                targetConversation={targetConversation}
-                conversations={(() => {
-                  const uniqueMap = new Map();
-
-                  // Filter deleted
-                  const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
-                  visible.forEach(c => {
-                    if (c && c.id) uniqueMap.set(String(c.id), c);
-                  });
-
-                  if (targetConversation && targetConversation.id) {
-                    const targetId = String(targetConversation.id);
-                    if (!uniqueMap.has(targetId)) {
-                      return [targetConversation, ...Array.from(uniqueMap.values())];
-                    }
-                  }
-                  return Array.from(uniqueMap.values());
-                })()}
-                onSendMessage={(conversationId, message) => {
-                  loadConversations();
-                }}
-                onDeleteConversation={async (convId) => {
-                  console.log("Deleting conversation:", convId);
-
-                  // Clear targetConversation if it's the one being deleted
-                  if (targetConversation && targetConversation.id === convId) {
-                    setTargetConversation(null);
-                  }
-
-                  setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
-                  const apiUrl = import.meta.env.VITE_API_URL || "";
-                  try {
-                    await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
-                      method: 'DELETE',
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    // Wait a bit for backend to process before reloading
-                    setTimeout(loadConversations, 100);
-                  } catch (e) {
-                    console.error("Failed to delete", e);
-                  }
-                }}
-                onMarkAsRead={async (convId) => {
-                  // Optimistically update local state
-                  setRealConversations(prev => prev.map(c =>
-                    c.id === convId ? { ...c, unreadCount: 0 } : c
-                  ));
-
-                  const apiUrl = import.meta.env.VITE_API_URL || "";
-                  try {
-                    await fetch(`${apiUrl}/api/messages/mark-read`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ conversationId: convId })
-                    });
-                    loadConversations();
-                  } catch (e) { console.error("Failed to mark read", e); }
-                }}
-                onMessageReceived={loadConversations}
-              />
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {activeTab === "settings" && (
-          <div className="settings-content">
-            <div className="page-header">
-              <h1>Settings</h1>
-              <p>Manage your account preferences</p>
-            </div>
-            {showProfileEdit ? (
-              <ProfileEdit
-                user={studentProfile || user}
-                token={token}
-                onSave={() => {
-                  setShowProfileEdit(false);
-                  loadDashboard();
-                }}
-                onCancel={() => setShowProfileEdit(false)}
-              />
-            ) : (
-              <div className="settings-sections">
-                <div className="settings-section">
-                  <h3>Profile Settings</h3>
-                  <p>Update your profile information and preferences.</p>
-                  <button className="btn-primary" onClick={() => setShowProfileEdit(true)}>
-                    Edit Profile
-                  </button>
-                </div>
-                <div className="settings-section">
-                  <h3>Account Settings</h3>
-                  <p>Manage your account preferences and security.</p>
-                  <button className="btn-secondary" disabled>
-                    Coming Soon
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
+          )
+        }
+      </main >
 
       {bookingModal && selectedTutor && (
         <div className="modal-overlay" onClick={closeBookingModal}>
@@ -1054,7 +1093,7 @@ export default function StudentDashboard() {
                 {selectedTutor.avatar?.startsWith("data:") || selectedTutor.avatar?.startsWith("http") ? (
                   <img src={selectedTutor.avatar} alt={selectedTutor.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                 ) : (
-                  selectedTutor.avatar || "👩‍🏫"
+                  selectedTutor.avatar || <User size={32} strokeWidth={1.5} />
                 )}
               </div>
               <div>
@@ -1212,7 +1251,19 @@ export default function StudentDashboard() {
               )}
 
               {paymentStep === 4 && (
-                <button className="modal-btn primary full-width" onClick={closeBookingModal} type="button">
+                <button
+                  className="modal-btn primary full-width"
+                  onClick={() => {
+                    closeBookingModal();
+                    setActiveTab("sessions"); // This updates local state
+                    // Also update URL to ensure persistence
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.set("tab", "sessions");
+                    newParams.delete("chatId"); // Clear any chat query
+                    setSearchParams(newParams);
+                  }}
+                  type="button"
+                >
                   View My Sessions
                 </button>
               )}
@@ -1222,13 +1273,15 @@ export default function StudentDashboard() {
       )}
 
 
-      {rescheduleDialog && (
-        <RescheduleDialog
-          session={rescheduleDialog}
-          onConfirm={handleRescheduleConfirm}
-          onCancel={handleRescheduleCancel}
-        />
-      )}
+      {
+        rescheduleDialog && (
+          <RescheduleDialog
+            session={rescheduleDialog}
+            onConfirm={handleRescheduleConfirm}
+            onCancel={handleRescheduleCancel}
+          />
+        )
+      }
 
       {/* Mobile Navigation */}
       <nav className="student-mobile-nav">
@@ -1251,6 +1304,6 @@ export default function StudentDashboard() {
           </button>
         ))}
       </nav>
-    </div>
+    </div >
   );
 }

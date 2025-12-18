@@ -9,43 +9,29 @@ export const getConversations = async (req, res) => {
     try {
         const userObjectId = new mongoose.Types.ObjectId(userId);
 
-        // Find conversations involving this user where they haven't hidden it
-        // Explicitly cast to ObjectId for robust array matching
+        // Find conversations involving this user where they aren't in the hiddenFor list
         let conversations = await Conversation.find({
-            participants: userObjectId
+            participants: userObjectId,
+            hiddenFor: { $ne: userObjectId }
         })
             .sort({ updatedAt: -1 })
             .populate("participants", "name avatar");
-
-        console.log(`[getConversations] User ${userId} found ${conversations.length} RAW conversations (ignoring hidden)`);
-        if (conversations.length > 0) {
-            console.log(`[DEBUG] First conv participants: ${JSON.stringify(conversations[0].participants.map(p => p._id))}`);
-            console.log(`[DEBUG] First conv hiddenFor: ${JSON.stringify(conversations[0].hiddenFor)}`);
-        }
-
-        if (conversations.length === 0) {
-            const totalParticipating = await Conversation.countDocuments({ participants: userObjectId });
-            const hiddenCount = await Conversation.countDocuments({ participants: userObjectId, hiddenFor: userObjectId });
-
-            console.log(`[DEBUG] Total participating: ${totalParticipating}, Hidden for user: ${hiddenCount}`);
-
-            // Check if string query works differently
-            const stringQueryCount = await Conversation.countDocuments({ participants: userId });
-            console.log(`[DEBUG] String query count: ${stringQueryCount}`);
-        }
 
         // Map to client format and deduplicate by partner ID
         const seenPartners = new Set();
         const formatted = [];
 
         for (const conv of conversations) {
+            // Find the other participant
             const otherUser = conv.participants.find(p => p._id.toString() !== userId);
-            if (!otherUser) {
-                console.log(`[getConversations] Skipping conv ${conv.conversationId} - No other user found. Participants: ${conv.participants.map(p => p._id?.toString()).join(', ')}`);
-                continue;
-            }
+
+            // If no other user (e.g. self-chat or data error), skip or handle gracefully
+            if (!otherUser) continue;
 
             const partnerId = otherUser._id.toString();
+
+            // Deduplication: If we've already seen a chat with this partner, skip this one.
+            // Since we sort by updatedAt: -1, we keep the most recent one.
             if (seenPartners.has(partnerId)) continue;
             seenPartners.add(partnerId);
 
@@ -56,23 +42,21 @@ export const getConversations = async (req, res) => {
             const clearTime = conv.clearedHistoryAt?.get(userId);
             if (clearTime && lastMsgTime && new Date(lastMsgTime) <= new Date(clearTime)) {
                 lastMsgText = "";
-                // Don't nullify time completely or sorting might break? 
-                // Actually sorting happened on DB query which sorts by updatedAt.
-                // But we display lastMessageTime. Let's keep it null for display.
                 lastMsgTime = null;
             }
 
+            // Only push if there's a valid partner
             formatted.push({
                 id: conv.conversationId,
+                conversationId: conv.conversationId, // redundancy for safety
                 name: otherUser.name,
                 avatar: otherUser.avatar,
+                partnerId: partnerId,
                 lastMessage: lastMsgText,
                 lastMessageTime: lastMsgTime,
                 unreadCount: conv.unreadCounts?.get(userId) || 0
             });
         }
-
-        console.log(`[getConversations] Returning ${formatted.length} formatted conversations`);
 
         res.json(formatted);
     } catch (error) {

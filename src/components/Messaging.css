@@ -341,6 +341,13 @@
   }
 }
 
+.actions-popup.popup-up {
+  top: auto;
+  bottom: 100%;
+  transform-origin: bottom center;
+  margin-bottom: 4px;
+}
+
 .actions-popup button {
   background: none;
   border: none;
@@ -597,5 +604,50 @@
   .message-content {
     max-width: 100%;
     /* Bubbles can be wider on mobile */
+  }
+}
+
+.conversation-preview .no-messages {
+  color: #aaa;
+  font-style: italic;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .actions-popup {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
+    transform: none;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.15);
+    padding: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1000;
+  }
+
+  .actions-popup button {
+    padding: 16px;
+    font-size: 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .actions-popup button:last-child {
+    border-bottom: none;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
   }
 }

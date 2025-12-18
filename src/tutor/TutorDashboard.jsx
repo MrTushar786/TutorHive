@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +12,12 @@ import {
   User,
   Video,
   Check,
-  X
+  X,
+  CheckCircle,
+  Star,
+  Search,
+  Clock,
+  Hourglass
 } from "lucide-react";
 import "./TutorDashboard.css";
 import useAuth from "../hooks/useAuth";
@@ -45,7 +51,15 @@ const defaultStats = {
 };
 
 export default function TutorDashboard() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "dashboard";
+
+  const setActiveTab = (tab) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("tab", tab);
+    if (tab !== "messages") newParams.delete("chatId");
+    setSearchParams(newParams);
+  };
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [sessionModal, setSessionModal] = useState(false);
   const [withdrawModal, setWithdrawModal] = useState(false);
@@ -76,17 +90,19 @@ export default function TutorDashboard() {
   const [realConversations, setRealConversations] = useState([]);
   const [targetConversation, setTargetConversation] = useState(null);
 
-  // Restore conversation if it reappears from backend
+  // Sync URL chatId to targetConversation
   useEffect(() => {
-    if (realConversations.length > 0 && deletedConvIds.length > 0) {
-      const activeRealIds = new Set(realConversations.map(c => c.id));
-      const newDeletedIds = deletedConvIds.filter(id => !activeRealIds.has(id));
-
-      if (newDeletedIds.length !== deletedConvIds.length) {
-        setDeletedConvIds(newDeletedIds);
+    const chatId = searchParams.get("chatId");
+    if (activeTab === "messages" && chatId && realConversations.length > 0) {
+      // Only set if we aren't already looking at it (to avoid loops if targetConversation has more data)
+      if (targetConversation?.id !== chatId) {
+        const conv = realConversations.find(c => c.id === chatId);
+        if (conv) setTargetConversation(conv);
       }
+    } else if (activeTab === "messages" && !chatId && targetConversation) {
+      setTargetConversation(null);
     }
-  }, [realConversations, deletedConvIds]);
+  }, [searchParams, activeTab, realConversations]);
 
   const dashboardLoadedRef = React.useRef(false);
 
@@ -240,8 +256,11 @@ export default function TutorDashboard() {
       // Remove from deleted list if it was there
       setDeletedConvIds(prev => prev.filter(id => id !== conversation.id));
 
-      setTargetConversation(conversation);
-      setActiveTab("messages");
+      // Trigger URL update to open chat
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set("tab", "messages");
+      newParams.set("chatId", conversation.id);
+      setSearchParams(newParams);
     } catch (err) {
       console.error("Failed to start chat", err);
     }
@@ -375,12 +394,12 @@ export default function TutorDashboard() {
               onClick={() => setActiveTab(tab)}
             >
               <span className="nav-icon">
-                {tab === "dashboard" && <LayoutDashboard size={20} />}
-                {tab === "students" && <Users size={20} />}
-                {tab === "schedule" && <Calendar size={20} />}
-                {tab === "earnings" && <DollarSign size={20} />}
-                {tab === "messages" && <MessageSquare size={20} />}
-                {tab === "settings" && <Settings size={20} />}
+                {tab === "dashboard" && <LayoutDashboard size={20} strokeWidth={1.5} />}
+                {tab === "students" && <Users size={20} strokeWidth={1.5} />}
+                {tab === "schedule" && <Calendar size={20} strokeWidth={1.5} />}
+                {tab === "earnings" && <DollarSign size={20} strokeWidth={1.5} />}
+                {tab === "messages" && <MessageSquare size={20} strokeWidth={1.5} />}
+                {tab === "settings" && <Settings size={20} strokeWidth={1.5} />}
               </span>
               <span>{tab.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>
             </button>
@@ -393,7 +412,7 @@ export default function TutorDashboard() {
               {tutorProfile?.avatar?.startsWith("data:") || tutorProfile?.avatar?.startsWith("http") ? (
                 <img src={tutorProfile.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : (
-                tutorProfile?.avatar || <User size={24} color="#666" />
+                tutorProfile?.avatar || <User size={24} color="#666" strokeWidth={1.5} />
               )}
             </div>
             <div className="user-info">
@@ -410,11 +429,11 @@ export default function TutorDashboard() {
             type="button"
             title="Edit Profile"
           >
-            <UserPen size={18} />
+            <UserPen size={18} strokeWidth={1.5} />
             <span>Edit Profile</span>
           </button>
           <button className="logout-btn" onClick={logout} type="button">
-            <LogOut size={18} />
+            <LogOut size={18} strokeWidth={1.5} />
             <span>Logout</span>
           </button>
         </div>
@@ -430,28 +449,28 @@ export default function TutorDashboard() {
 
             <div className="stats-grid">
               <div className="stat-card orange">
-                <div className="stat-icon">👥</div>
+                <div className="stat-icon"><Users size={28} color="white" strokeWidth={1.5} /></div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.totalStudents}</div>
                   <div className="stat-label">Total Students</div>
                 </div>
               </div>
               <div className="stat-card blue">
-                <div className="stat-icon">📚</div>
+                <div className="stat-icon"><CheckCircle size={28} color="white" strokeWidth={1.5} /></div>
                 <div className="stat-info">
                   <div className="stat-value">{stats.completedSessions}</div>
                   <div className="stat-label">Completed Sessions</div>
                 </div>
               </div>
               <div className="stat-card purple">
-                <div className="stat-icon">💰</div>
+                <div className="stat-icon"><DollarSign size={28} color="white" strokeWidth={1.5} /></div>
                 <div className="stat-info">
                   <div className="stat-value">{formatCurrency(stats.totalEarnings)}</div>
                   <div className="stat-label">Total Earnings</div>
                 </div>
               </div>
               <div className="stat-card green">
-                <div className="stat-icon">⭐</div>
+                <div className="stat-icon"><Star size={28} color="white" strokeWidth={1.5} /></div>
                 <div className="stat-info">
                   <div className="stat-value">{(stats.averageRating || 0).toFixed(1)}</div>
                   <div className="stat-label">Average Rating</div>
@@ -478,7 +497,7 @@ export default function TutorDashboard() {
                         {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
                           <img src={session.avatar} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                         ) : (
-                          session.avatar || "👨‍🎓"
+                          session.avatar || <User size={24} strokeWidth={1.5} />
                         )}
                       </div>
                       <div className="session-details">
@@ -502,7 +521,13 @@ export default function TutorDashboard() {
                 <div className="activity-list">
                   {recentActivity.map((activity) => (
                     <div key={activity.id} className="activity-item">
-                      <div className="activity-icon">{activity.icon}</div>
+                      <div className={`activity-icon ${activity.type || 'default'}`}>
+                        {activity.type === "completed" && <CheckCircle size={20} color="white" strokeWidth={1.5} />}
+                        {(activity.type === "confirmed" || activity.type === "upcoming") && <Calendar size={20} color="white" strokeWidth={1.5} />}
+                        {activity.type === "pending" && <Hourglass size={20} color="white" strokeWidth={1.5} />}
+                        {activity.type === "cancelled" && <X size={20} color="white" strokeWidth={1.5} />}
+                        {!["completed", "confirmed", "upcoming", "pending", "cancelled"].includes(activity.type) && <Calendar size={20} color="white" strokeWidth={1.5} />}
+                      </div>
                       <div className="activity-details">
                         <div className="activity-message">{activity.message}</div>
                         <div className="activity-time">{formatDate(activity.time)}</div>
@@ -524,7 +549,7 @@ export default function TutorDashboard() {
 
             <div className="search-filter-bar">
               <div className="search-box">
-                <span className="search-icon">🔍</span>
+                <span className="search-icon"><Search size={18} strokeWidth={1.5} /></span>
                 <input
                   type="text"
                   placeholder="Search by student name or subject..."
@@ -554,7 +579,7 @@ export default function TutorDashboard() {
                         <img src={student.avatar} alt={student.name} />
                       ) : (
                         <div className="avatar-placeholder" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                          {student.avatar || "👨‍🎓"}
+                          {student.avatar || <User size={32} strokeWidth={1.5} color="#666" />}
                         </div>
                       )}
                     </div>
@@ -562,15 +587,15 @@ export default function TutorDashboard() {
                       <div className="student-name-row">
                         <h3>{student.name}</h3>
                         <div className="student-rating-pill">
-                          <span>⭐</span>
+                          <Star size={12} fill="#FFC107" strokeWidth={0} />
                           <span>4.8</span>
                         </div>
                       </div>
                       <div className="student-subject-text">{student.subject || "General"}</div>
 
                       <div className="student-stats-row">
-                        <span>📅 {formatDate(student.lastSession)}</span>
-                        <span>⏱️ {(student.totalHours || 0).toFixed(1)}h</span>
+                        <span><Calendar size={14} style={{ display: 'inline', marginRight: 4 }} strokeWidth={1.5} /> {formatDate(student.lastSession)}</span>
+                        <span><Clock size={14} style={{ display: 'inline', marginRight: 4 }} strokeWidth={1.5} /> {(student.totalHours || 0).toFixed(1)}h</span>
                       </div>
                     </div>
                   </div>
@@ -657,14 +682,14 @@ export default function TutorDashboard() {
                             {session.avatar?.startsWith("data:") || session.avatar?.startsWith("http") ? (
                               <img src={session.avatar} alt="" />
                             ) : (
-                              <User size={14} />
+                              <User size={14} strokeWidth={1.5} />
                             )}
                           </span>
                           {session.student}
                         </span>
                         <span className="simple-dot">•</span>
                         <span className="simple-meta">
-                          <Calendar size={14} style={{ marginRight: 4 }} /> {formatTime(session.startTime)}
+                          <Calendar size={14} style={{ marginRight: 4 }} strokeWidth={1.5} /> {formatTime(session.startTime)}
                         </span>
                         <span className="simple-dot">•</span>
                         <span className="simple-meta">
@@ -683,24 +708,35 @@ export default function TutorDashboard() {
                         onClick={() => handleMessageStudent({ id: session.studentId, name: session.student, avatar: session.avatar })}
                         title="Message"
                       >
-                        <MessageSquare size={20} />
+                        <MessageSquare size={20} strokeWidth={1.5} />
                       </button>
 
                       {sessionsFilter === "upcoming" && session.status === "confirmed" && (
                         <button className="btn-simple primary" onClick={() => handleJoinSession(session)}>
-                          <Video size={16} style={{ marginRight: 6 }} /> Join
+                          <Video size={16} style={{ marginRight: 6 }} strokeWidth={1.5} /> Join
+                        </button>
+                      )}
+
+                      {sessionsFilter === "upcoming" && session.status === "confirmed" && (
+                        <button
+                          className="btn-simple success"
+                          onClick={() => handleMarkComplete(session)}
+                          title="Mark as Completed"
+                          style={{ background: '#4CAF50', color: 'white' }}
+                        >
+                          <CheckCircle size={16} strokeWidth={1.5} />
                         </button>
                       )}
 
                       {session.status === "pending" && (
                         <button className="btn-simple primary" onClick={() => handleConfirmSession(session)} style={{ background: '#4CAF50' }}>
-                          <Check size={16} style={{ marginRight: 6 }} /> Confirm
+                          <Check size={16} style={{ marginRight: 6 }} strokeWidth={1.5} /> Confirm
                         </button>
                       )}
 
                       {sessionsFilter === "upcoming" && session.status !== "cancelled" && (
                         <button className="btn-simple danger" onClick={() => handleCancelSession(session)} title="Cancel">
-                          <X size={20} />
+                          <X size={20} strokeWidth={1.5} />
                         </button>
                       )}
                     </div>
@@ -852,6 +888,15 @@ export default function TutorDashboard() {
                   } catch (e) { console.error("Failed to mark read", e); }
                 }}
                 onMessageReceived={loadConversations}
+                onSelectConversation={(conv) => {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (conv) {
+                    newParams.set("chatId", conv.id);
+                  } else {
+                    newParams.delete("chatId");
+                  }
+                  setSearchParams(newParams);
+                }}
               />
             </ErrorBoundary>
           </div>

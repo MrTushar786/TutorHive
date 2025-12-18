@@ -26,12 +26,28 @@ export function createMessageWebSocketServer() {
 
     // Send existing messages
     try {
+      // Check for cleared history timestamp
+      const conversation = await Conversation.findOne({ conversationId });
+      let dateFilter = {};
+
+      if (conversation && conversation.clearedHistoryAt) {
+        const clearTime = conversation.clearedHistoryAt.get(userId);
+        if (clearTime) {
+          dateFilter = { createdAt: { $gt: clearTime } };
+        }
+      }
+
       const dbMessages = await Message.find({
         conversationId,
-        deletedBy: { $ne: new mongoose.Types.ObjectId(userId) }
+        deletedBy: { $ne: new mongoose.Types.ObjectId(userId) },
+        ...dateFilter
       })
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .limit(50)
         .populate("sender", "name");
+
+      // Reverse to chronological order
+      dbMessages.reverse();
 
       const formattedMessages = dbMessages.map((msg) => ({
         id: msg._id.toString(),
@@ -67,9 +83,11 @@ export function createMessageWebSocketServer() {
           // Update Conversation document
           try {
             // Check if conversation exists, if not create it
-            // Participants are derived from conversationId "conv-user1-user2"
+            // Check if conversation exists, if not create it
+            // Participants are derived from conversationId which could be "id1-id2" or "conv-id1-id2"
             const parts = conversationId.split("-");
-            const participants = [parts[1], parts[2]];
+            // If length is 3 (conv-id1-id2), take indices 1 and 2. If length is 2 (id1-id2), take 0 and 1.
+            const participants = parts.length === 3 ? [parts[1], parts[2]] : [parts[0], parts[1]];
 
             // NOTE: Dynamic import to avoid circular dependency issues if any, though standard import is fine usually. 
             // We use standard import in this file usually. Let's assume imported at top.
@@ -89,7 +107,8 @@ export function createMessageWebSocketServer() {
                 $inc: {
                   [`unreadCounts.${participants.find(p => p !== userId)}`]: 1
                 },
-                $pull: { hiddenFor: { $in: participants } } // Un-hide for everyone involved
+                $pull: { hiddenFor: { $in: participants } }, // Un-hide for everyone involved
+                $unset: { [`clearedHistoryAt.${userId}`]: "" } // Reset clear history for sender to ensure they see their own message
               },
               { upsert: true, new: true }
             );

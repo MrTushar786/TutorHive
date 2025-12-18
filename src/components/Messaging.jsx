@@ -4,15 +4,22 @@ import { createWSClient } from "../utils/wsClient";
 import { ArrowLeft, MoreVertical, Edit2, Trash2, Check, X } from "lucide-react";
 import { editMessage, deleteMessage } from "../api/messages";
 
-function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation, onMarkAsRead, targetConversation, onMessageReceived }) {
+function Messaging({ currentUser, token, conversations = [], onSendMessage, onDeleteConversation, onMarkAsRead, targetConversation, onMessageReceived, onSelectConversation }) {
   const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // Auto-mark as read when conversation is selected/visible
+  useEffect(() => {
+    if (selectedConversation && onMarkAsRead && conversations.length > 0) {
+      const activeConv = conversations.find(c => c.id === selectedConversation.id);
+      if (activeConv && activeConv.unreadCount > 0) {
+        onMarkAsRead(activeConv.id);
+      }
+    }
+  }, [selectedConversation, conversations, onMarkAsRead]);
 
   useEffect(() => {
     if (targetConversation) {
       setSelectedConversation(targetConversation);
-      if (targetConversation.unreadCount > 0 && onMarkAsRead) {
-        onMarkAsRead(targetConversation.id);
-      }
     }
   }, [targetConversation]);
   const [messageText, setMessageText] = useState("");
@@ -35,28 +42,72 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
     };
   }, [selectedConversation, currentUser?._id]);
 
+  // Ref to track the *current* conversation ID for the WS callbacks
+  const currentConvIdRef = useRef(null);
+
   useEffect(() => {
-    setMessages([]);
-    setEditingMessageId(null);
-    setMenuOpenId(null);
+    // Only clear if we are genuinely switching to a new conversation
+    if (selectedConversation && selectedConversation.id) {
+      // Only clear if ID changed
+      if (currentConvIdRef.current !== selectedConversation.id) {
+        setMessages([]);
+        setEditingMessageId(null);
+        setMenuOpenId(null);
+      }
+      currentConvIdRef.current = selectedConversation.id;
+    } else {
+      currentConvIdRef.current = null;
+    }
   }, [selectedConversation?.id]);
+
+  useEffect(() => {
+    // Click outside to close menu
+    const handleClickOutside = (event) => {
+      if (menuOpenId && !event.target.closest(".actions-popup") && !event.target.closest(".menu-trigger")) {
+        setMenuOpenId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpenId]);
 
   const connectWebSocket = () => {
     if (!selectedConversation || !currentUser?._id || !selectedConversation.id) return;
+
+    // Capture the ID this socket is meant for
+    const targetConvId = selectedConversation.id;
+
     if (wsRef.current) wsRef.current.close();
 
     wsRef.current = createWSClient({
       path: "/ws/messages",
       queryParams: {
-        conversationId: selectedConversation.id,
+        conversationId: targetConvId,
         userId: currentUser._id,
       },
       onOpen: () => setWsConnected(true),
       onMessage: (data) => {
+        // CRITICAL GATING: Ignore if user switched conversation
+        if (currentConvIdRef.current !== targetConvId) return;
+
         if (data.type === "messages") {
           setMessages(data.messages || []);
         } else if (data.type === "new-message") {
-          setMessages((prev) => [...prev, data.message]);
+          setMessages((prev) => {
+            // Deduplication Logic
+            const newMsg = data.message;
+
+            // 1. Prevent exact ID duplicates
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+
+            // 2. Remove optimistic match (same text, same sender, temporary ID)
+            const filtered = prev.filter(m =>
+              !(m.id.startsWith("local-") && m.text === newMsg.text && m.sender === newMsg.sender)
+            );
+
+            return [...filtered, newMsg];
+          });
+
           // Notify parent (dashboard) to refresh conversation list (e.g. bring to top, update preview)
           if (onMessageReceived) onMessageReceived(data.message);
         }
@@ -85,6 +136,7 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
       sender: currentUser._id,
       senderName: currentUser.name,
       timestamp: new Date().toISOString(),
+      isOptimistic: true
     };
     setMessages((prev) => [...prev, localMessage]);
     setMessageText("");
@@ -169,9 +221,23 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
     });
   };
 
+  // Scroll to bottom logic
+  const isFirstLoadRef = useRef(true);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, editingMessageId]);
+    isFirstLoadRef.current = true;
+  }, [selectedConversation?.id]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      if (isFirstLoadRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        isFirstLoadRef.current = false;
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages]);
 
   return (
     <div className="messaging-container">
@@ -190,7 +256,7 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
                 className={`conversation-item ${selectedConversation?.id === conv.id ? "active" : ""}`}
                 onClick={() => {
                   setSelectedConversation(conv);
-                  if (onMarkAsRead) onMarkAsRead(conv.id);
+                  if (onSelectConversation) onSelectConversation(conv);
                 }}
               >
                 <div className="conversation-avatar">
@@ -202,7 +268,9 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
                 </div>
                 <div className="conversation-info">
                   <div className="conversation-name">{conv.name}</div>
-                  <div className="conversation-preview">{conv.lastMessage}</div>
+                  <div className="conversation-preview">
+                    {conv.lastMessage || <span className="no-messages">No messages yet</span>}
+                  </div>
                 </div>
                 {conv.unreadCount > 0 && <div className="unread-badge">{conv.unreadCount}</div>}
               </div>
@@ -218,7 +286,10 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
             <div className="chat-header">
               <button
                 className="back-button"
-                onClick={() => setSelectedConversation(null)}
+                onClick={() => {
+                  setSelectedConversation(null);
+                  if (onSelectConversation) onSelectConversation(null);
+                }}
               >
                 <ArrowLeft size={20} />
               </button>
@@ -247,6 +318,7 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
                       onConfirm: () => {
                         onDeleteConversation(selectedConversation.id);
                         setSelectedConversation(null);
+                        if (onSelectConversation) onSelectConversation(null);
                       }
                     });
                   }}
@@ -257,10 +329,11 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
             </div>
 
             <div className="messages-list">
-              {messages.map((message) => {
+              {messages.map((message, index) => {
                 const isOwn = message.sender === currentUser._id;
                 const showMenu = menuOpenId === message.id;
                 const isSystem = message.isDeleted;
+                const isNearBottom = index >= messages.length - 2;
 
                 return (
                   <div key={message.id} className={`message ${isOwn ? "own" : "other"} ${isSystem ? "system" : ""}`}>
@@ -302,7 +375,7 @@ function Messaging({ currentUser, token, conversations = [], onSendMessage, onDe
                             <MoreVertical size={14} />
                           </button>
                           {showMenu && (
-                            <div className="actions-popup">
+                            <div className={`actions-popup ${isNearBottom ? "popup-up" : ""}`}>
                               {isOwn && (
                                 <button onClick={() => startEditing(message)}>
                                   <Edit2 size={14} /> Edit
