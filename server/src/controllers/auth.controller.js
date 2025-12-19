@@ -24,7 +24,8 @@ export async function register(req, res) {
     role: payload.role,
     // Store generic bio if provided, or leave for profile
     bio: payload.bio,
-    avatar: payload.avatar
+    avatar: payload.avatar,
+    hourlyRate: payload.hourlyRate // Sync hourlyRate to User model for booking calculations
   });
 
   // 2. If Tutor, Create TutorProfile
@@ -128,6 +129,7 @@ export async function updateProfile(req, res) {
   if (updates.avatar) user.avatar = updates.avatar;
   // If we decide bio lives on Profile, we can skip it here, but let's keep it synced for now or just on User
   if (updates.bio) user.bio = updates.bio;
+  if (updates.hourlyRate !== undefined) user.hourlyRate = updates.hourlyRate; // Sync hourlyRate to User model
   await user.save();
 
   // 2. Update TutorProfile if applicable

@@ -245,6 +245,59 @@ body {
   font-size: 0.5rem;
 }
 
+/* Session Feedback */
+/* Session Feedback - Compact & Professional */
+.session-feedback {
+  margin-top: 0.6rem;
+  padding: 0.25rem 0.75rem;
+  background: #FFF9C4;
+  /* Light yellow from image */
+  border-radius: 20px;
+  /* Pillow shape */
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.8rem;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.feedback-rating {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.feedback-rating svg {
+  display: inline-block;
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.rating-val {
+  display: none;
+}
+
+.feedback-comment {
+  font-size: 0.8rem;
+  color: #8D6E63;
+  /* Darker yellow/orange text */
+  line-height: normal;
+  font-weight: 500;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+  padding-left: 0;
+}
+
+.feedback-comment::before {
+  display: none;
+}
+
 .simple-actions {
   display: flex;
   align-items: center;

@@ -458,7 +458,7 @@ export default function TutorDashboard() {
               <div className="stat-card blue">
                 <div className="stat-icon"><CheckCircle size={28} color="white" strokeWidth={1.5} /></div>
                 <div className="stat-info">
-                  <div className="stat-value">{stats.completedSessions}</div>
+                  <div className="stat-value">{stats.completedLessons || stats.completedSessions || 0}</div>
                   <div className="stat-label">Completed Sessions</div>
                 </div>
               </div>
@@ -700,6 +700,27 @@ export default function TutorDashboard() {
                           ${session.price}
                         </span>
                       </div>
+
+                      {session.status === "completed" && session.feedback && (
+                        <div className="session-feedback">
+                          <div className="feedback-rating">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={14}
+                                fill={i < session.feedback.rating ? "#FFC107" : "none"}
+                                color={i < session.feedback.rating ? "#FFC107" : "#CBD5E0"}
+                                strokeWidth={1.5}
+                              />
+                            ))}
+                          </div>
+                          {session.feedback.comment && (
+                            <div className="feedback-comment">
+                              "{session.feedback.comment}"
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="simple-actions">
@@ -785,20 +806,31 @@ export default function TutorDashboard() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Month</th>
-                        <th>Sessions</th>
-                        <th>Earnings</th>
+                        <th>Date</th>
+                        <th>Student</th>
+                        <th>Duration</th>
+                        <th>Amount</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {earningsHistory.map((item) => (
-                        <tr key={item.month}>
-                          <td>{item.month}</td>
-                          <td>{item.sessions}</td>
-                          <td>{formatCurrency(item.earnings)}</td>
+                        <tr key={item.id}>
+                          <td>{formatDate(item.date)}</td>
+                          <td>{item.student}</td>
+                          <td>{item.duration} min</td>
+                          <td>{formatCurrency(item.amount)}</td>
                           <td>
-                            <span className="status-paid">Paid</span>
+                            <span className="status-badge paid" style={{
+                              background: 'rgba(76, 175, 80, 0.1)',
+                              color: '#4CAF50',
+                              padding: '4px 12px',
+                              borderRadius: '20px',
+                              fontSize: '0.85rem',
+                              fontWeight: '600'
+                            }}>
+                              Paid
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -810,135 +842,139 @@ export default function TutorDashboard() {
           </div>
         )}
 
-        {activeTab === "messages" && (
-          <div className="messages-content">
-            <ErrorBoundary>
-              <Messaging
-                currentUser={user}
-                token={token}
-                targetConversation={targetConversation}
-                conversations={(() => {
-                  const uniqueMap = new Map();
+        {
+          activeTab === "messages" && (
+            <div className="messages-content">
+              <ErrorBoundary>
+                <Messaging
+                  currentUser={user}
+                  token={token}
+                  targetConversation={targetConversation}
+                  conversations={(() => {
+                    const uniqueMap = new Map();
 
-                  // Add real conversations first (server truth)
-                  const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
-                  visible.forEach(c => {
-                    if (c && c.id) uniqueMap.set(String(c.id), c);
-                  });
+                    // Add real conversations first (server truth)
+                    const visible = realConversations.filter(c => !deletedConvIds.includes(c.id));
+                    visible.forEach(c => {
+                      if (c && c.id) uniqueMap.set(String(c.id), c);
+                    });
 
-                  // Ensure target conversation is included
-                  if (targetConversation && targetConversation.id) {
-                    const targetId = String(targetConversation.id);
-                    if (!uniqueMap.has(targetId)) {
-                      // If not in list, add it (e.g. new chat)
-                      // Prepend or append? Map preserves insertion order.
-                      // If we want it at top, we should have added it first?
-                      // But if we add it first, we might overwrite it with "stale" info?
-                      // Actually, realConversations is better data. 
-                      // So keep real if exists. If not, add target.
-                      // To force it to top visually, we might need array spread.
+                    // Ensure target conversation is included
+                    if (targetConversation && targetConversation.id) {
+                      const targetId = String(targetConversation.id);
+                      if (!uniqueMap.has(targetId)) {
+                        // If not in list, add it (e.g. new chat)
+                        // Prepend or append? Map preserves insertion order.
+                        // If we want it at top, we should have added it first?
+                        // But if we add it first, we might overwrite it with "stale" info?
+                        // Actually, realConversations is better data. 
+                        // So keep real if exists. If not, add target.
+                        // To force it to top visually, we might need array spread.
 
-                      // But Map set appends.
-                      // Let's just return [...values] and maybe sort?
-                      // Or simple approach:
-                      return [targetConversation, ...Array.from(uniqueMap.values())];
+                        // But Map set appends.
+                        // Let's just return [...values] and maybe sort?
+                        // Or simple approach:
+                        return [targetConversation, ...Array.from(uniqueMap.values())];
+                      }
                     }
-                  }
 
-                  return Array.from(uniqueMap.values());
-                })()}
-                onSendMessage={(conversationId, message) => {
-                  loadConversations();
-                }}
-                onDeleteConversation={async (convId) => {
-                  console.log("Deleting conversation:", convId);
-
-                  if (targetConversation && targetConversation.id === convId) {
-                    setTargetConversation(null);
-                  }
-
-                  setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
-                  const apiUrl = import.meta.env.VITE_API_URL || "";
-                  try {
-                    await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
-                      method: 'DELETE',
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    setTimeout(loadConversations, 100);
-                  } catch (e) {
-                    console.error("Failed to delete", e);
-                  }
-                }}
-                onMarkAsRead={async (convId) => {
-                  setRealConversations(prev => prev.map(c =>
-                    c.id === convId ? { ...c, unreadCount: 0 } : c
-                  ));
-
-                  const apiUrl = import.meta.env.VITE_API_URL || "";
-                  try {
-                    await fetch(`${apiUrl}/api/messages/mark-read`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ conversationId: convId })
-                    });
+                    return Array.from(uniqueMap.values());
+                  })()}
+                  onSendMessage={(conversationId, message) => {
                     loadConversations();
-                  } catch (e) { console.error("Failed to mark read", e); }
-                }}
-                onMessageReceived={loadConversations}
-                onSelectConversation={(conv) => {
-                  const newParams = new URLSearchParams(searchParams);
-                  if (conv) {
-                    newParams.set("chatId", conv.id);
-                  } else {
-                    newParams.delete("chatId");
-                  }
-                  setSearchParams(newParams);
-                }}
-              />
-            </ErrorBoundary>
-          </div>
-        )}
+                  }}
+                  onDeleteConversation={async (convId) => {
+                    console.log("Deleting conversation:", convId);
 
-        {activeTab === "settings" && (
-          <div className="settings-content">
-            <div className="page-header">
-              <h1>Settings</h1>
-              <p>Manage your profile and preferences</p>
+                    if (targetConversation && targetConversation.id === convId) {
+                      setTargetConversation(null);
+                    }
+
+                    setDeletedConvIds((prev) => (prev.includes(convId) ? prev : [...prev, convId]));
+                    const apiUrl = import.meta.env.VITE_API_URL || "";
+                    try {
+                      await fetch(`${apiUrl}/api/messages/conversations/${convId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      setTimeout(loadConversations, 100);
+                    } catch (e) {
+                      console.error("Failed to delete", e);
+                    }
+                  }}
+                  onMarkAsRead={async (convId) => {
+                    setRealConversations(prev => prev.map(c =>
+                      c.id === convId ? { ...c, unreadCount: 0 } : c
+                    ));
+
+                    const apiUrl = import.meta.env.VITE_API_URL || "";
+                    try {
+                      await fetch(`${apiUrl}/api/messages/mark-read`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ conversationId: convId })
+                      });
+                      loadConversations();
+                    } catch (e) { console.error("Failed to mark read", e); }
+                  }}
+                  onMessageReceived={loadConversations}
+                  onSelectConversation={(conv) => {
+                    const newParams = new URLSearchParams(searchParams);
+                    if (conv) {
+                      newParams.set("chatId", conv.id);
+                    } else {
+                      newParams.delete("chatId");
+                    }
+                    setSearchParams(newParams);
+                  }}
+                />
+              </ErrorBoundary>
             </div>
-            {showProfileEdit ? (
-              <ProfileEdit
-                user={tutorProfile || user}
-                token={token}
-                onSave={() => {
-                  setShowProfileEdit(false);
-                  loadDashboard();
-                }}
-                onCancel={() => setShowProfileEdit(false)}
-              />
-            ) : (
-              <div className="settings-sections">
-                <div className="settings-section">
-                  <h3>Profile Settings</h3>
-                  <p>Update your profile information, subjects, and rates.</p>
-                  <button className="btn-primary" onClick={() => setShowProfileEdit(true)}>
-                    Edit Profile
-                  </button>
-                </div>
-                <div className="settings-section">
-                  <h3>Account Settings</h3>
-                  <p>Manage your account preferences and security.</p>
-                  <button className="btn-secondary" disabled>
-                    Coming Soon
-                  </button>
-                </div>
+          )
+        }
+
+        {
+          activeTab === "settings" && (
+            <div className="settings-content">
+              <div className="page-header">
+                <h1>Settings</h1>
+                <p>Manage your profile and preferences</p>
               </div>
-            )}
-          </div>
-        )}
-      </main>
+              {showProfileEdit ? (
+                <ProfileEdit
+                  user={tutorProfile || user}
+                  token={token}
+                  onSave={() => {
+                    setShowProfileEdit(false);
+                    loadDashboard();
+                  }}
+                  onCancel={() => setShowProfileEdit(false)}
+                />
+              ) : (
+                <div className="settings-sections">
+                  <div className="settings-section">
+                    <h3>Profile Settings</h3>
+                    <p>Update your profile information, subjects, and rates.</p>
+                    <button className="btn-primary" onClick={() => setShowProfileEdit(true)}>
+                      Edit Profile
+                    </button>
+                  </div>
+                  <div className="settings-section">
+                    <h3>Account Settings</h3>
+                    <p>Manage your account preferences and security.</p>
+                    <button className="btn-secondary" disabled>
+                      Coming Soon
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        }
+      </main >
 
       {sessionModal && selectedStudent && (
         <div className="modal-overlay" onClick={closeSessionModal}>
@@ -996,91 +1032,93 @@ export default function TutorDashboard() {
       )}
 
       {/* Withdrawal Gateway Demo Modal */}
-      {withdrawModal && (
-        <div className="modal-overlay" onClick={() => { if (withdrawStep !== 2) setWithdrawModal(false); }}>
-          <div className="modal-content withdrawal-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>💳 Withdraw Funds</h2>
-              <button className="modal-close" onClick={() => setWithdrawModal(false)}>×</button>
-            </div>
+      {
+        withdrawModal && (
+          <div className="modal-overlay" onClick={() => { if (withdrawStep !== 2) setWithdrawModal(false); }}>
+            <div className="modal-content withdrawal-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>💳 Withdraw Funds</h2>
+                <button className="modal-close" onClick={() => setWithdrawModal(false)}>×</button>
+              </div>
 
-            <div className="modal-body">
-              {withdrawStep === 1 && (
-                <div className="withdrawal-step">
-                  <div className="balance-info">
-                    <span>Available Balance</span>
-                    <span className="amount">{formatCurrency(stats.totalEarnings)}</span>
-                  </div>
+              <div className="modal-body">
+                {withdrawStep === 1 && (
+                  <div className="withdrawal-step">
+                    <div className="balance-info">
+                      <span>Available Balance</span>
+                      <span className="amount">{formatCurrency(stats.totalEarnings)}</span>
+                    </div>
 
-                  <div className="form-group">
-                    <label>Payment Method</label>
-                    <select className="form-input">
-                      <option>🏦 Bank Transfer (**** 1234)</option>
-                      <option>🅿️ PayPal (user@example.com)</option>
-                    </select>
-                  </div>
+                    <div className="form-group">
+                      <label>Payment Method</label>
+                      <select className="form-input">
+                        <option>🏦 Bank Transfer (**** 1234)</option>
+                        <option>🅿️ PayPal (user@example.com)</option>
+                      </select>
+                    </div>
 
-                  <div className="form-group">
-                    <label>Amount to Withdraw</label>
-                    <div className="amount-input-wrapper">
-                      <span className="currency-prefix">$</span>
-                      <input type="number" className="form-input" defaultValue={stats.totalEarnings} max={stats.totalEarnings} />
+                    <div className="form-group">
+                      <label>Amount to Withdraw</label>
+                      <div className="amount-input-wrapper">
+                        <span className="currency-prefix">$</span>
+                        <input type="number" className="form-input" defaultValue={stats.totalEarnings} max={stats.totalEarnings} />
+                      </div>
+                    </div>
+
+                    <div className="gateway-note">
+                      <p>🔒 Secure Gateway Connected</p>
                     </div>
                   </div>
+                )}
 
-                  <div className="gateway-note">
-                    <p>🔒 Secure Gateway Connected</p>
+                {withdrawStep === 2 && (
+                  <div className="withdrawal-processing">
+                    <div className="spinner large"></div>
+                    <p>Processing with Bank...</p>
+                    <span className="sub-text">Verifying credentials & checking liquidity</span>
                   </div>
-                </div>
-              )}
+                )}
 
-              {withdrawStep === 2 && (
-                <div className="withdrawal-processing">
-                  <div className="spinner large"></div>
-                  <p>Processing with Bank...</p>
-                  <span className="sub-text">Verifying credentials & checking liquidity</span>
-                </div>
-              )}
+                {withdrawStep === 3 && (
+                  <div className="withdrawal-success">
+                    <div className="success-icon">✅</div>
+                    <h3>Withdrawal Initiated!</h3>
+                    <p>Your funds are on the way. You should receive them within 1-2 business days.</p>
+                  </div>
+                )}
+              </div>
 
-              {withdrawStep === 3 && (
-                <div className="withdrawal-success">
-                  <div className="success-icon">✅</div>
-                  <h3>Withdrawal Initiated!</h3>
-                  <p>Your funds are on the way. You should receive them within 1-2 business days.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              {withdrawStep === 1 && (
-                <>
-                  <button className="modal-btn secondary" onClick={() => setWithdrawModal(false)}>Cancel</button>
+              <div className="modal-footer">
+                {withdrawStep === 1 && (
+                  <>
+                    <button className="modal-btn secondary" onClick={() => setWithdrawModal(false)}>Cancel</button>
+                    <button
+                      className="modal-btn primary"
+                      onClick={() => {
+                        setWithdrawStep(2);
+                        setTimeout(() => setWithdrawStep(3), 2000); // Simulate network delay
+                      }}
+                    >
+                      Confirm Withdrawal
+                    </button>
+                  </>
+                )}
+                {withdrawStep === 3 && (
                   <button
-                    className="modal-btn primary"
+                    className="modal-btn primary full-width"
                     onClick={() => {
-                      setWithdrawStep(2);
-                      setTimeout(() => setWithdrawStep(3), 2000); // Simulate network delay
+                      setWithdrawModal(false);
+                      setWithdrawStep(1);
                     }}
                   >
-                    Confirm Withdrawal
+                    Done
                   </button>
-                </>
-              )}
-              {withdrawStep === 3 && (
-                <button
-                  className="modal-btn primary full-width"
-                  onClick={() => {
-                    setWithdrawModal(false);
-                    setWithdrawStep(1);
-                  }}
-                >
-                  Done
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Mobile Navigation */}
       <nav className="tutor-mobile-nav">
@@ -1104,7 +1142,7 @@ export default function TutorDashboard() {
           </button>
         ))}
       </nav>
-    </div>
+    </div >
   );
 }
 

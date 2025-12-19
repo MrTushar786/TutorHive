@@ -42,6 +42,19 @@ export async function getDashboard(req, res) {
   const studentsMap = new Map();
   bookings.forEach((booking) => {
     if (booking.student) {
+      // SELF-HEARLING: If booking has 0 price but is completed/confirmed, and tutor has a rate, update it.
+      // This fixes legacy data or data created before rate was set.
+      if ((booking.price === 0 || !booking.price) && (booking.status === 'completed' || booking.status === 'confirmed') && tutorProfile.hourlyRate > 0) {
+        const newPrice = Math.round((booking.duration / 60) * tutorProfile.hourlyRate);
+        if (newPrice > 0) {
+          booking.price = newPrice;
+          // We can't await inside forEach easily, but we can fire-and-forget update or do it in bulk before this loop.
+          // For display purposes, we update the object instance 'booking'. 
+          // Ideally we should also save to DB.
+          Booking.updateOne({ _id: booking._id }, { price: newPrice }).exec();
+        }
+      }
+
       const current = studentsMap.get(booking.student._id?.toString()) ?? {
         ...booking.student.toJSON(),
         id: booking.student._id,
@@ -102,13 +115,15 @@ export async function getDashboard(req, res) {
     await tutorProfile.save();
   }
 
-  const earningsByMonth = completedBookings.reduce((acc, booking) => {
-    const monthKey = booking.startTime.toLocaleString("default", { month: "short", year: "numeric" });
-    acc[monthKey] = acc[monthKey] || { sessions: 0, earnings: 0 };
-    acc[monthKey].sessions += 1;
-    acc[monthKey].earnings += booking.price || 0;
-    return acc;
-  }, {});
+  // Detailed Earnings History (Individual Sessions)
+  const detailedEarnings = completedBookings.map(booking => ({
+    id: booking._id,
+    date: booking.startTime,
+    student: booking.student?.name || "Student",
+    duration: booking.duration,
+    amount: booking.price || 0,
+    status: "Paid"
+  })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const recentActivity = bookings.slice(-6).reverse().map((booking) => ({
     id: booking._id,
@@ -130,13 +145,7 @@ export async function getDashboard(req, res) {
     tutor: mergedTutor,
     upcomingSessions,
     myStudents: Array.from(studentsMap.values()),
-    earningsHistory: Object.entries(earningsByMonth)
-      .sort((a, b) => new Date(b[0]) - new Date(a[0]))
-      .slice(0, 12)
-      .map(([month, data]) => ({
-        month,
-        ...data,
-      })),
+    earningsHistory: detailedEarnings,
     recentActivity,
   });
 }
